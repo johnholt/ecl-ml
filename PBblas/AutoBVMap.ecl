@@ -1,5 +1,4 @@
-﻿IMPORT * FROM $;
-IMPORT Std.Str;
+﻿IMPORT Std.Str;
 IMPORT std.system.Thorlib;
 IMPORT PBblas;
 dimension_t := PBblas.Types.dimension_t;
@@ -7,98 +6,40 @@ partition_t := PBblas.Types.partition_t;
 IMPORT ML.MAT;
 
 EXPORT AutoBVMap(dimension_t m_rows, dimension_t m_cols,
-                  dimension_t f_b_rows=0, dimension_t f_b_cols=0, UNSIGNED maxrows=5000, UNSIGNED maxcols=2500) 
+                  dimension_t f_b_rows=0, dimension_t f_b_cols=0,
+                  UNSIGNED maxrows=1000, UNSIGNED maxcols=1000)
     := MODULE(PBblas.IMatrix_Map)
+//  ASSERT(f_b_rows=0 OR f_b_cols=0 OR f_b_rows=m_rows OR f_b_cols=m_cols,
+//          'Not a vector of blocks!', FAIL);
   SHARED nodes_available := Thorlib.nodes();
-  SHARED MapMatrix := FUNCTION
-      
-      //This is the function used to reduce the number of
-      //rows or columns per block. This is only called once
-      //per AutoMap for either cutting row or columns.
-      //NEVER BOTH!
-      //x = row/col size of dataset
-      //y = maxrow/maxcol
-      //z = clustersize
-      findsize(UNSIGNED4 x, UNSIGNED4 y, UNSIGNED4 z) := FUNCTION
-             
-             blocks := MAX((x DIV (y * z)) * z, z); //blocks is a multiple of the cluster size
-             blockSize := (x + blocks - 1) DIV blocks; //blockSize is CEILING(x/blocks)
-             RETURN blockSize;
-             
-        END;
-      
-      //Reaching this function mean that the number of rows and cols in dataset
-      //Are below the number of maxrows and maxcols.
-      //In this case, the entire matrix will be the block.
-      smallcols := FUNCTION
-      
-        RETURN [m_rows, m_cols];
-      
-      END;
-      
-      
-      //Reduce the size of cols per block so that they are smaller than the maxcols
-      //Cluster size is used to get as even a distribution as possible.
-      //part rows = m_rows && part cols = result
-      largecols := FUNCTION
-        cutcols := findsize(m_cols, maxcols, CLUSTERSIZE);
-        RETURN [m_rows, cutcols];
-      END;
-      
-      //We have established that we have a small number of rows
-      //Now it is time to check and see if we have a large number of columns
-      //If larger we need to reduce the number of cols per block
-      smallrows := FUNCTION
-          RETURN if(m_cols > maxcols, largecols, smallcols);
-      
-      END;
-      
-      
-      //Reduce the size of rows per block so that they are smaller than the maxrows
-      //Cluster size is used to get as even a distribution as possible.
-      //part rows = result && part cols = m_cols
-      largerows  := FUNCTION
-        cutrows := findsize(m_rows, maxrows, CLUSTERSIZE);
-        RETURN [cutrows, m_cols];
-      END;
-      
-      
-      //Block sizes have been provided.
-      definedsize := FUNCTION
-        RETURN [f_b_rows, f_b_cols];
-      END;
-      
-      
-      //Check to see of number of rows is larger than the maxrows allowed per block
-      //If larger we need to reduce the number of rows per block
-      //If smaller we are done with row portion of our partition. (part rows = m_rows)
-      nodefinedsize := FUNCTION
-        RETURN if(m_rows > maxrows, largerows, smallrows);
-      END;
-      
-      //Check to see if blocks are defined. If not call no defined size.
-      multinode := FUNCTION
-       RETURN IF((f_b_rows > 0 AND f_b_cols > 0), definedsize, nodefinedsize );
-      END;
-      
-      SET OF dimension_t blockrowcolset := FUNCTION
-       RETURN IF(nodes_available=1, [m_rows,m_cols], multinode );
-      END;
-      
-      RETURN blockrowcolset;
-    
-    END;
-  
-  
-  
-  
+  SHARED VectorMap := MODULE
+    SHARED entries := MAX(m_rows,1)*MAX(m_cols,1);
+    SHARED max_entries_per_node := MIN(MAX(maxrows*maxcols,1000),10000);
+    SHARED vector_size := MAX(MAP(f_b_cols = m_cols           => m_cols,
+                                  f_b_rows = m_rows           => m_rows,
+                                  m_cols < m_rows             => m_cols,
+                                  m_rows),
+                             1);
+    SHARED vectors := MAX(MAP(f_b_cols = m_cols             => m_rows,
+                              f_b_rows = m_rows             => m_cols,
+                              m_cols < m_rows               => m_rows,
+                              m_cols),
+                          1);
+    SHARED max_vectors_per_node := 1 + (max_entries_per_node-1) DIV vector_size;
+    SHARED min_nodes := 1 + (vectors-1) DIV max_vectors_per_node;
+    SHARED cycles := 1 + (min_nodes-1) DIV nodes_available;
+    SHARED work_partitions := cycles * nodes_available;
+    SHARED vectors_per_part := 1 + (vectors-1) DIV work_partitions;
+    EXPORT full_block_rows := IF(m_rows=vector_size, m_rows, vectors_per_part);
+    EXPORT full_block_cols := IF(m_cols=vector_size, m_cols, vectors_per_part);
+  END; // VectorMap
+  //
   SHARED this_node       := Thorlib.node();
   //
-  EXPORT row_blocks   := IF(f_b_rows>0, ((m_rows-1) DIV f_b_rows) + 1, 1);
-  EXPORT col_blocks   := IF(f_b_cols>0, ((m_cols-1) DIV f_b_cols) + 1, 1);
-  SHARED rowcol := MapMatrix;
-  SHARED block_rows   := rowcol[1];
-  SHARED block_cols   := rowcol[2];
+  EXPORT block_rows   := VectorMap.full_block_rows;
+  EXPORT block_cols   := VectorMap.full_block_cols;
+  EXPORT row_blocks   := ((m_rows-1) DIV block_rows) + 1;
+  EXPORT col_blocks   := ((m_cols-1) DIV block_cols) + 1;
   //
   EXPORT matrix_rows  := m_rows;
   EXPORT matrix_cols  := m_cols;

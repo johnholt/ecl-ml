@@ -924,37 +924,20 @@ END;
       SHARED mX := IF(NOT EXISTS(mX_0), 
                     Mat.Vec.ToCol(Mat.Vec.From(Mat.Has(mY).Stats.xmax, 1.0), 1), 
                     Mat.InsertColumn(mX_0, 1, 1.0)); // Insert X1=1 column
-      mXstats := Mat.Has(mX).Stats;
-      mX_n := mXstats.XMax;
-      mX_m := mXstats.YMax;
+      SHARED mXstats := Mat.Has(mX).Stats;
+      SHARED mX_n := mXstats.XMax;
+      SHARED mX_m := mXstats.YMax;
+      SHARED mYstats := Mat.Has(mY).Stats;
+      SHARED mY_n := mYstats.XMax;
+      SHARED mY_m := mYstats.YMax;
+      SHARED num_rows := MAX(mX_n, mY_n);  // zero rows in X or Y do not appear
 
-      //Map for Matrix X. Map will be used to derive all other maps in Logis
-      havemaxrow := maxrows > 0;
-      havemaxcol := maxcols > 0;
-      havemaxrowcol := havemaxrow and havemaxcol;
-
-      derivemap := IF(havemaxrowcol, PBblas.AutoBVMap(mX_n, mX_m,prows,pcols,maxrows, maxcols),
-        IF(havemaxrow, PBblas.AutoBVMap(mX_n, mX_m,prows,pcols,maxrows),
-        IF(havemaxcol, PBblas.AutoBVMap(mX_n, mX_m,prows,pcols,,maxcols),
-        PBblas.AutoBVMap(mX_n, mX_m,prows,pcols))));
-
-      sizeRec := RECORD
-        PBblas.Types.dimension_t m_rows;
-        PBblas.Types.dimension_t m_cols;
-        PBblas.Types.dimension_t f_b_rows;
-        PBblas.Types.dimension_t f_b_cols;
-      END;
-
-      SHARED sizeTable := DATASET([{derivemap.matrix_rows,derivemap.matrix_cols,derivemap.part_rows(1),derivemap.part_cols(1)}], sizeRec);
-
-
-      mXmap := PBblas.Matrix_Map(sizeTable[1].m_rows,sizeTable[1].m_cols,sizeTable[1].f_b_rows,sizeTable[1].f_b_cols);
+      SHARED mXmap := PBblas.Matrix_Map(num_rows,mX_m);
+      SHARED mYmap := PBblas.Matrix_Map(num_rows, mY_m);
       //Create block matrix X
       mXdist := DMAT.Converted.FromElement(mX,mXmap);
 
-
       //Create block matrix Y
-      mYmap := PBblas.Matrix_Map(sizeTable[1].m_rows, 1, sizeTable[1].f_b_rows, 1);
       mYdist := DMAT.Converted.FromElement(mY, mYmap);
 
       //New Matrix Generator
@@ -965,23 +948,23 @@ END;
       END;
 
       //Create block matrix W
-      mW := DATASET(sizeTable[1].m_rows, gen(COUNTER, sizeTable[1].m_rows, 1.0),DISTRIBUTED);
+      mW := DATASET(num_rows, gen(COUNTER, num_rows, 1.0),DISTRIBUTED);
       mWdist := DMAT.Converted.FromCells(mYmap, mW);
 
       //Create block matrix Ridge
-      mRidge := DATASET(sizeTable[1].m_cols, gen(COUNTER, sizeTable[1].m_cols, ridge),DISTRIBUTED);
-      RidgeVecMap := PBblas.Matrix_Map(sizeTable[1].m_cols, 1, sizeTable[1].f_b_cols, 1);
-      Ridgemap := PBblas.Matrix_Map(sizeTable[1].m_cols, sizeTable[1].m_cols, sizeTable[1].f_b_cols, sizeTable[1].f_b_cols);
+      mRidge := DATASET(mX_m, gen(COUNTER, mX_m, ridge),DISTRIBUTED);
+      RidgeVecMap := PBblas.Matrix_Map(mX_m, 1, mXmap.block_cols, 1);
+      Ridgemap := PBblas.Matrix_Map(mX_m, mX_m, mXmap.block_cols, mXmap.block_cols);
       mRidgeVec := DMAT.Converted.FromCells(RidgeVecMap, mRidge);
       mRidgedist := PBblas.Vector2Diag(RidgeVecMap, mRidgeVec, Ridgemap);
 
       //Create block matrix Beta
-      mBeta0 := DATASET(sizeTable[1].m_cols, gen(COUNTER, sizeTable[1].m_cols, 0.0),DISTRIBUTED);
-      mBeta0map := PBblas.Matrix_Map(sizeTable[1].m_cols, 1, sizeTable[1].f_b_cols, 1);
+      mBeta0 := DATASET(mX_m, gen(COUNTER, mX_m, 0.0),DISTRIBUTED);
+      mBeta0map := PBblas.Matrix_Map(mX_m, mY_m, mXmap.block_cols, mY_m);
       mBeta00 := PBblas.MU.To(DMAT.Converted.FromCells(mBeta0map,mBeta0), mu_comp.Beta);
 
       //Create block matrix OldExpY
-      OldExpY_0 := DATASET(sizeTable[1].m_rows, gen(COUNTER, sizeTable[1].m_rows, -1),DISTRIBUTED); // -ones(size(mY))
+      OldExpY_0 := DATASET(num_rows, gen(COUNTER, num_rows, -1),DISTRIBUTED); // -ones(size(mY))
       OldExpY_00 := PBblas.MU.To(DMAT.Converted.FromCells(mYmap,OldExpY_0), mu_comp.Y);
 
 
@@ -1005,9 +988,9 @@ END;
             PBblas.Types.dimension_t c) := abs(v);
             
       //Maps used in Step function
-      weightsMap := PBblas.Matrix_Map(sizeTable[1].m_rows, sizeTable[1].m_rows, sizeTable[1].f_b_rows, sizeTable[1].f_b_rows);
-      xWeightMap := PBblas.Matrix_Map(sizeTable[1].m_cols, sizeTable[1].m_rows, sizeTable[1].f_b_cols, sizeTable[1].f_b_rows);
-      xtranswadjyMap := PBblas.Matrix_Map(sizeTable[1].m_cols, 1, sizeTable[1].f_b_cols, 1);
+      weightsMap := PBblas.Matrix_Map(num_rows, num_rows, mXmap.block_rows, mXmap.block_rows);
+      xWeightMap := PBblas.Matrix_Map(mX_m, num_rows, mXmap.block_cols, mXmap.block_rows);
+      xtranswadjyMap := PBblas.Matrix_Map(mX_m, mY_m, mXmap.block_cols, mY_m);
 
         
       Step(DATASET(PBblas.Types.MUElement) BetaPlusY, INTEGER coun) := FUNCTION
@@ -1079,7 +1062,7 @@ END;
         BE := DATASET([{1,1,err}],Mat.Types.Element);
         BetaError := DMAT.Converted.FromElement(BE,errmap);
 
-        BME := DATASET([{1,1,sizeTable[1].m_cols*Epsilon}],Mat.Types.Element);
+        BME := DATASET([{1,1,mX_m*Epsilon}],Mat.Types.Element);
         BetaMaxError := DMAT.Converted.FromElement(BME,errmap);         
 
         RETURN PBblas.MU.To(mBeta, mu_comp.Beta)
@@ -1091,10 +1074,10 @@ END;
       END;
       
       errmap := PBblas.Matrix_Map(1, 1, 1, 1);
-      BE := DATASET([{1,1,sizeTable[1].m_cols*Epsilon+1}],Mat.Types.Element);
+      BE := DATASET([{1,1,mX_m*Epsilon+1}],Mat.Types.Element);
       BetaError00 := PBblas.MU.To(DMAT.Converted.FromElement(BE,errmap), mu_comp.BetaError);
       
-      BME := DATASET([{1,1,sizeTable[1].m_cols*Epsilon}],Mat.Types.Element);
+      BME := DATASET([{1,1,mX_m*Epsilon}],Mat.Types.Element);
       BetaMaxError00 := PBblas.MU.To(DMAT.Converted.FromElement(BME,errmap), mu_comp.BetaMaxError); 
       SHARED BetaPair := LOOP(mBeta00+OldExpY_00+BetaError00+BetaMaxError00
             , (COUNTER<=MaxIter)
@@ -1103,8 +1086,8 @@ END;
             , Step(ROWS(LEFT),COUNTER)
             ); 
 
-      SHARED mBeta00map := PBblas.Matrix_Map(sizeTable[1].m_cols, 1, sizeTable[1].f_b_cols, 1);  
-      SHARED xwxmap := PBblas.Matrix_Map(sizeTable[1].m_cols, sizeTable[1].m_cols, sizeTable[1].f_b_cols, sizeTable[1].f_b_cols);
+      SHARED mBeta00map := PBblas.Matrix_Map(mX_m, mY_m, mXmap.block_cols, mY_m);
+      SHARED xwxmap := PBblas.Matrix_Map(mX_m, mX_m, mXmap.block_cols, mXmap.block_cols);
     
       EXPORT Beta := FUNCTION
         mubeta := DMAT.Converted.FromPart2DS(DMAT.Trans.Matrix(mBeta00map,PBblas.MU.From(BetaPair, mu_comp.Beta)));
@@ -1263,24 +1246,25 @@ EXPORT SoftMax(DATASET (MAT.Types.Element) IntTHETA, REAL8 LAMBDA=0.001, REAL8 A
   SHARED groundTruth:= Utils.ToGroundTruth (Y);//Instead of working with label matrix we work with groundTruth matrix
   //groundTruth is a Numclass*NumSamples matrix. groundTruth(i,j)=1 if label of the jth sample is i, otherwise groundTruth(i,j)=0
   SHARED NumClass := Mat.Has(groundTruth).Stats.XMax;
-  SHARED sizeRec := RECORD
-    PBblas.Types.dimension_t m_rows;
-    PBblas.Types.dimension_t m_cols;
-    PBblas.Types.dimension_t f_b_rows;
-    PBblas.Types.dimension_t f_b_cols;
-  END;
+//  SHARED sizeRec := RECORD
+//    PBblas.Types.dimension_t m_rows;
+//    PBblas.Types.dimension_t m_cols;
+//    PBblas.Types.dimension_t f_b_rows;
+//    PBblas.Types.dimension_t f_b_cols;
+//  END;
    //Map for Matrix d.
-    SHARED havemaxrow := maxrows > 0;
-    SHARED havemaxcol := maxcols > 0;
-    SHARED havemaxrowcol := havemaxrow and havemaxcol;
+//    SHARED havemaxrow := maxrows > 0;
+//    SHARED havemaxcol := maxcols > 0;
+//    SHARED havemaxrowcol := havemaxrow and havemaxcol;
     SHARED dstats := Mat.Has(d).Stats;
-    SHARED d_n := dstats.XMax;
-    SHARED d_m := dstats.YMax;
-    derivemap := IF(havemaxrowcol, PBblas.AutoBVMap(d_n, d_m,prows,pcols,maxrows, maxcols),
-                   IF(havemaxrow, PBblas.AutoBVMap(d_n, d_m,prows,pcols,maxrows),
-                      IF(havemaxcol, PBblas.AutoBVMap(d_n, d_m,prows,pcols,,maxcols),
-                      PBblas.AutoBVMap(d_n, d_m,prows,pcols))));
-    SHARED sizeTable := DATASET([{derivemap.matrix_rows,derivemap.matrix_cols,derivemap.part_rows(1),derivemap.part_cols(1)}], sizeRec);
+    SHARED d_n := dstats.XMax;  // Matrix X
+    SHARED d_m := dstats.YMax;  // Matrix X
+//    derivemap := IF(havemaxrowcol, PBblas.AutoBVMap(d_n, d_m,prows,pcols,maxrows, maxcols),
+//                   IF(havemaxrow, PBblas.AutoBVMap(d_n, d_m,prows,pcols,maxrows),
+//                      IF(havemaxcol, PBblas.AutoBVMap(d_n, d_m,prows,pcols,,maxcols),
+//                      PBblas.AutoBVMap(d_n, d_m,prows,pcols))));
+//    SHARED sizeTable := DATASET([{derivemap.matrix_rows,derivemap.matrix_cols,derivemap.part_rows(1),derivemap.part_cols(1)}], sizeRec);
+    mXmap := PBblas.Matrix_Map(d_n, d_m);
     Ones_VecMap := PBblas.Matrix_Map(1, NumClass, 1, NumClass);
     //New Vector Generator
     Layout_Cell gen(UNSIGNED4 c, UNSIGNED4 NumRows) := TRANSFORM
@@ -1292,19 +1276,24 @@ EXPORT SoftMax(DATASET (MAT.Types.Element) IntTHETA, REAL8 LAMBDA=0.001, REAL8 A
     Ones_Vec := DATASET(NumClass, gen(COUNTER, NumClass));
     Ones_Vecdist := DMAT.Converted.FromCells(Ones_VecMap, Ones_Vec);
     //Create block matrix d
-    dmap := PBblas.Matrix_Map(sizeTable[1].m_rows,sizeTable[1].m_cols,sizeTable[1].f_b_rows,sizeTable[1].f_b_cols);
-    ddist := DMAT.Converted.FromElement(d,dmap);
+//    dmap := PBblas.Matrix_Map(sizeTable[1].m_rows,sizeTable[1].m_cols,sizeTable[1].f_b_rows,sizeTable[1].f_b_cols);
+    ddist := DMAT.Converted.FromElement(d,mXmap);
     //Create block matrix groundTruth
-    groundTruthmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_cols, NumClass, sizeTable[1].f_b_cols);
+//    groundTruthmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_cols, NumClass, sizeTable[1].f_b_cols);
+    groundTruthMap := PBblas.Matrix_Map(NumClass, d_m, NumClass, mXmap.block_cols);
     groundTruthdist := DMAT.Converted.FromElement(groundTruth, groundTruthmap);
     // creat block matrix for IntTHETA
-    IntTHETAmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_rows, NumClass, sizeTable[1].f_b_rows);
+//    IntTHETAmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_rows, NumClass, sizeTable[1].f_b_rows);
+    IntTHETAmap := PBblas.Matrix_Map(NumClass, d_n, NumClass, mXmap.block_rows);
     IntTHETAdist := DMAT.Converted.FromElement(IntTHETA, IntTHETAmap);
     //Maps used in step fucntion
-    col_col_map := PBblas.Matrix_Map(sizeTable[1].m_cols, sizeTable[1].m_cols, sizeTable[1].f_b_cols, sizeTable[1].f_b_cols);
-    THETAmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_rows, NumClass, sizeTable[1].f_b_rows);
+//    col_col_map := PBblas.Matrix_Map(sizeTable[1].m_cols, sizeTable[1].m_cols, sizeTable[1].f_b_cols, sizeTable[1].f_b_cols);
+    col_col_map := PBblas.Matrix_Map(d_m, d_m, mXmap.block_cols, mXmap.block_cols);
+//    THETAmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_rows, NumClass, sizeTable[1].f_b_rows);
+    THETAmap := PBblas.Matrix_Map(NumClass, d_n, NumClass, mXmap.block_rows);
     txmap := groundTruthmap;
-    SumColMap := PBblas.Matrix_Map(1, sizeTable[1].m_cols, 1, sizeTable[1].f_b_cols);
+//    SumColMap := PBblas.Matrix_Map(1, sizeTable[1].m_cols, 1, sizeTable[1].f_b_cols);
+    SumColMap := PBblas.MAtrix_Map(1, d_m, 1, mXmap.block_cols);
     //functions used in step fucntion
     PBblas.Types.value_t e(PBblas.Types.value_t v,PBblas.Types.dimension_t r,PBblas.Types.dimension_t c) := exp(v);
     PBblas.Types.value_t reci(PBblas.Types.value_t v,PBblas.Types.dimension_t r,PBblas.Types.dimension_t c) := 1/v;
@@ -1312,7 +1301,7 @@ EXPORT SoftMax(DATASET (MAT.Types.Element) IntTHETA, REAL8 LAMBDA=0.001, REAL8 A
     m_1 := -1 * (1/m);
     Step(DATASET(PBblas.Types.Layout_Part ) THETA) := FUNCTION
       // tx=(theta*d);
-      tx := PBblas.PB_dgemm(FALSE, FALSE, 1.0, THETAmap, THETA, dmap, ddist, txmap);
+      tx := PBblas.PB_dgemm(FALSE, FALSE, 1.0, THETAmap, THETA, mXmap, ddist, txmap);
       // tx_M = bsxfun(@minus, tx, max(tx, [], 1));
       tx_mat := DMat.Converted.FromPart2Elm(tx);
       MaxCol_tx_mat := Mat.Has(tx_mat).MaxCol;
@@ -1334,7 +1323,7 @@ EXPORT SoftMax(DATASET (MAT.Types.Element) IntTHETA, REAL8 LAMBDA=0.001, REAL8 A
       Prob := PBblas.PB_dgemm(FALSE, FALSE, 1.0, txmap, exp_tx_M, col_col_map, SumCol_exp_tx_M_rcip_diag, txmap);
       second_term := PBblas.PB_dscal((1-ALPHA*LAMBDA), THETA);
       groundTruth_Prob := PBblas.PB_daxpy(1.0,groundTruthdist,PBblas.PB_dscal(-1, Prob));
-      groundTruth_Prob_x := PBblas.PB_dgemm(FALSE, True, 1.0, txmap, groundTruth_Prob, dmap, ddist, THETAmap);
+      groundTruth_Prob_x := PBblas.PB_dgemm(FALSE, True, 1.0, txmap, groundTruth_Prob, mXmap, ddist, THETAmap);
       // first_term := PBblas.PB_dscal((-1*ALPHA*m_1), groundTruth_Prob_x);
       // UpdatedTHETA := PBblas.PB_daxpy(1.0, first_term, second_term);
       UpdatedTHETA := PBblas.PB_daxpy((-1*ALPHA*m_1), groundTruth_Prob_x, second_term);
@@ -1355,25 +1344,26 @@ EXPORT SoftMax(DATASET (MAT.Types.Element) IntTHETA, REAL8 LAMBDA=0.001, REAL8 A
     dt := Types.ToMatrix (X);
     dTmp := Mat.InsertColumn(dt,1,1.0);
     d := Mat.Trans(dTmp);
-    sizeRec := RECORD
-      PBblas.Types.dimension_t m_rows;
-      PBblas.Types.dimension_t m_cols;
-      PBblas.Types.dimension_t f_b_rows;
-      PBblas.Types.dimension_t f_b_cols;
-    END;
+//    sizeRec := RECORD
+//      PBblas.Types.dimension_t m_rows;
+//      PBblas.Types.dimension_t m_cols;
+//      PBblas.Types.dimension_t f_b_rows;
+//      PBblas.Types.dimension_t f_b_cols;
+//    END;
    //Map for Matrix d.
-    havemaxrow := maxrows > 0;
-    havemaxcol := maxcols > 0;
-    havemaxrowcol := havemaxrow and havemaxcol;
+//    havemaxrow := maxrows > 0;
+//    havemaxcol := maxcols > 0;
+//    havemaxrowcol := havemaxrow and havemaxcol;
     dstats := Mat.Has(d).Stats;
     d_n := dstats.XMax;
     d_m := dstats.YMax;
-    derivemap := IF(havemaxrowcol, PBblas.AutoBVMap(d_n, d_m,prows,pcols,maxrows, maxcols),
-                   IF(havemaxrow, PBblas.AutoBVMap(d_n, d_m,prows,pcols,maxrows),
-                      IF(havemaxcol, PBblas.AutoBVMap(d_n, d_m,prows,pcols,,maxcols),
-                      PBblas.AutoBVMap(d_n, d_m,prows,pcols))));
-    sizeTable := DATASET([{derivemap.matrix_rows,derivemap.matrix_cols,derivemap.part_rows(1),derivemap.part_cols(1)}], sizeRec);
-    dmap := PBblas.Matrix_Map(sizeTable[1].m_rows,sizeTable[1].m_cols,sizeTable[1].f_b_rows,sizeTable[1].f_b_cols);
+//    derivemap := IF(havemaxrowcol, PBblas.AutoBVMap(d_n, d_m,prows,pcols,maxrows, maxcols),
+//                   IF(havemaxrow, PBblas.AutoBVMap(d_n, d_m,prows,pcols,maxrows),
+//                      IF(havemaxcol, PBblas.AutoBVMap(d_n, d_m,prows,pcols,,maxcols),
+//                      PBblas.AutoBVMap(d_n, d_m,prows,pcols))));
+//    sizeTable := DATASET([{derivemap.matrix_rows,derivemap.matrix_cols,derivemap.part_rows(1),derivemap.part_cols(1)}], sizeRec);
+//    dmap := PBblas.Matrix_Map(sizeTable[1].m_rows,sizeTable[1].m_cols,sizeTable[1].f_b_rows,sizeTable[1].f_b_cols);
+    dmap := PBblas.Matrix_Map(d_n, d_m);
     //Create block matrix d
     ddist := DMAT.Converted.FromElement(d,dmap);
     param := Model (mod);
@@ -1388,11 +1378,15 @@ EXPORT SoftMax(DATASET (MAT.Types.Element) IntTHETA, REAL8 LAMBDA=0.001, REAL8 A
     //Create Ones Vector for the calculations in the step fucntion
     Ones_Vec := DATASET(NumClass, gen(COUNTER, NumClass),DISTRIBUTED);
     Ones_Vecdist := DMAT.Converted.FromCells(Ones_VecMap, Ones_Vec);
-    THETAmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_rows, NumClass, sizeTable[1].f_b_rows);
+//    THETAmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_rows, NumClass, sizeTable[1].f_b_rows);
+    THETAmap := PBblas.Matrix_Map(NumClass, d_n, NumClass, dmap.block_rows);
     THETA := DMAT.Converted.FromElement(param, THETAmap);
-    txmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_cols, NumClass, sizeTable[1].f_b_cols);
-    SumColMap := PBblas.Matrix_Map(1, sizeTable[1].m_cols, 1, sizeTable[1].f_b_cols);
-    col_col_map := PBblas.Matrix_Map(sizeTable[1].m_cols, sizeTable[1].m_cols, sizeTable[1].f_b_cols, sizeTable[1].f_b_cols);
+//    txmap := PBblas.Matrix_Map(NumClass, sizeTable[1].m_cols, NumClass, sizeTable[1].f_b_cols);
+    txmap := PBblas.Matrix_Map(NumClass, d_m, NumClass, dmap.block_cols);
+//    SumColMap := PBblas.Matrix_Map(1, sizeTable[1].m_cols, 1, sizeTable[1].f_b_cols);
+    SumColMap := PBblas.MAtrix_Map(1, d_m, 1, dmap.block_cols);
+//    col_col_map := PBblas.Matrix_Map(sizeTable[1].m_cols, sizeTable[1].m_cols, sizeTable[1].f_b_cols, sizeTable[1].f_b_cols);
+    col_col_map := PBblas.Matrix_Map(d_m, d_m, dmap.block_cols, dmap.block_cols);
     PBblas.Types.value_t reci(PBblas.Types.value_t v,PBblas.Types.dimension_t r,PBblas.Types.dimension_t c) := 1/v;
     tx := PBblas.PB_dgemm(FALSE, FALSE, 1.0, THETAmap, THETA, dmap, ddist, txmap);
     // tx_M = bsxfun(@minus, tx, max(tx, [], 1));
@@ -1422,13 +1416,13 @@ EXPORT SoftMax(DATASET (MAT.Types.Element) IntTHETA, REAL8 LAMBDA=0.001, REAL8 A
     numrow := MAX (Dist,Dist.value);
     S:= SORT(Dist,id,conf);
     SeqRec := RECORD
-    l_result;
-    INTEGER8 Sequence := 0;
+      l_result;
+      INTEGER8 Sequence := 0;
     END;
     //add seq field to S
     SeqRec AddS (S l, INTEGER c) := TRANSFORM
-    SELF.Sequence := c%numrow;
-    SELF := l;
+      SELF.Sequence := c%numrow;
+      SELF := l;
     END;
     Sseq := PROJECT(S, AddS(LEFT,COUNTER));
     classified := Sseq (Sseq.Sequence=0);

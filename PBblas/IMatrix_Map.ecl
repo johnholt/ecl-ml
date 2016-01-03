@@ -4,6 +4,8 @@ IMPORT PBblas.Types;
 EXPORT IMatrix_Map := MODULE
   EXPORT Types.dimension_t  matrix_rows;
   EXPORT Types.dimension_t  matrix_cols;
+  EXPORT Types.dimension_t  block_rows; // rows in a full block/partition
+  EXPORT Types.dimension_t  block_cols; // cols in a full block/partition
   EXPORT Types.node_t       nodes_used;
   EXPORT Types.partition_t  partitions_used;
   EXPORT Types.partition_t  row_blocks;

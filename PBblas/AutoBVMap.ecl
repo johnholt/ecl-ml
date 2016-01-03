@@ -1,4 +1,4 @@
-﻿IMPORT Std.Str;
+IMPORT Std.Str;
 IMPORT std.system.Thorlib;
 IMPORT PBblas;
 dimension_t := PBblas.Types.dimension_t;

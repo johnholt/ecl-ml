@@ -11,6 +11,7 @@ EXPORT Types := MODULE
   EXPORT Diagonal     := ENUM(UNSIGNED1, UnitTri=1, NotUnitTri=2);  //Warning
   EXPORT Side         := ENUM(UNSIGNED1, Ax=1, xA=2);  //Warning
   EXPORT t_mu_no      := UNSIGNED2; //Allow up to 64k matrices in one universe
+  EXPORT nominal_t    := UNSIGNED2;
 
   // Sparse
   EXPORT Layout_Cell  := RECORD   // WARNING:  Do not change without MakeR8Set
@@ -42,5 +43,59 @@ EXPORT Types := MODULE
   //Matrix Universe
   EXPORT MUElement := RECORD(Layout_Part)
     t_mu_no no; // The number of the matrix within the universe
+  END;
+  // Matrix Partitioning scheme
+  EXPORT Layout_Matrix_Desc := RECORD
+    dimension_t matrix_rows;
+    dimension_t matrix_cols;
+    nominal_t matrix_nominal;
+    BOOLEAN isSquare;
+  END;
+  EXPORT Operation := ENUM(Multiply, LeftSolve, RightSolve, Single);
+  EXPORT Layout_Operation := RECORD
+    nominal_t nominal_A;
+    nominal_t nominal_B;
+    nominal_t nominal_C;
+    Operation op;
+    BOOLEAN trans_A;
+    BOOLEAN trans_B;
+  END;
+  EXPORT Layout_Operation makeLeftSolve(BOOLEAN trans_A, nominal_t nom_A,
+                                        nominal_t nom_B) := TRANSFORM
+    SELF.nominal_A := nom_A;
+    SELF.nominal_B := nom_B;
+    SELF.op := Operation.LeftSolve;
+    SELF.trans_A := trans_A;
+    SELF := [];
+  END;
+  EXPORT Layout_Operation makeRightSolve(BOOLEAN trans_A, nominal_t nom_a,
+                                        nominal_t nom_B) := TRANSFORM
+    SELF.nominal_A := nom_A;
+    SELF.nominal_B := nom_B;
+    SELF.op := Operation.RightSolve;
+    SELF.trans_A := trans_A;
+    SELF := [];
+  END;
+  EXPORT Layout_Operation makeSingle(nominal_t nom_a) := TRANSFORM
+    SELF.nominal_A := nom_A;
+    SELF.op := Operation.Single;
+    SELF := [];
+  END;
+  EXPORT Layout_Operation makeMultiply(BOOLEAN trans_A, nominal_t nom_A,
+                                       BOOLEAN trans_B, nominal_t nom_B,
+                                       UNSIGNED2 nom_C) := TRANSFORM
+    SELF.nominal_A := nom_A;
+    SELF.nominal_B := nom_B;
+    SELF.nominal_C := nom_C;
+    SELF.op := Operation.Multiply;
+    SELF.trans_A := trans_A;
+    SELF.trans_B := trans_B;
+  END;
+  EXPORT Layout_Scheme := RECORD
+    dimension_t matrix_rows;
+    dimension_t matrix_cols;
+    dimension_t block_rows; // rows in full block/partition
+    dimension_t block_cols; // cols in full block/partition
+    nominal_t matrix_nominal;
   END;
 END;

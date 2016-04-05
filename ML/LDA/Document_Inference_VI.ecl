@@ -1,9 +1,9 @@
 IMPORT $ AS LDA;
 //Alias for convenience
-Doc_Assigned := LDA.Types.Doc_Assigned;
+Doc_Assigned := LDA.Types.Doc_Assigned_EM;
 Doc_Mapped := LDA.Types.Doc_Mapped;
-Doc_Topics := LDA.Types.Doc_Topics;
-Model_Parameters := LDA.Types.Model_Parameters;
+Doc_Topics := LDA.Types.Doc_Topics_EM;
+Model_Parameters := LDA.Types.EM_Model_Parameters;
 TermFreq_DataSet := LDA.Types.TermFreq_DataSet;
 Document_Scored := LDA.Types.Document_Scored;
 
@@ -17,7 +17,7 @@ Document_Scored := LDA.Types.Document_Scored;
  * @return the model-document set with topic values
  */
 EXPORT DATASET(LDA.Types.Document_Scored)
-       Document_Inference(DATASET(LDA.Types.Model_Parameters) parameters,
+    Document_Inference_VI(DATASET(LDA.Types.EM_Model_Parameters) parameters,
                           DATASET(LDA.Types.Model_Topic) model_estimates,
                           DATASET(LDA.Types.Model_Collection_Stats) stats,
                           DATASET(LDA.Types.Doc_Mapped) docs) := FUNCTION
@@ -34,11 +34,11 @@ EXPORT DATASET(LDA.Types.Document_Scored)
                    RIGHT.model IN LEFT.models,
                    assign_model(LEFT,RIGHT), ALL);  // model is a very small set
   // Working version of the model from the parameters, collections, estimates
-  wmod_0 := LDA.initial_model(parameters, model_estimates, stats);
-  Work_Mod := RECORD(LDA.Types.Model_Topic_Result)
+  wmod_0 := LDA.initial_em_model(parameters, model_estimates, stats);
+  Work_Mod := RECORD(LDA.Types.Model_Topic_EM_Result)
     UNSIGNED2 node;
   END;
-  Work_Mod replicate(LDA.Types.Model_Topic_Result mtr, UNSIGNED c) := TRANSFORM
+  Work_Mod replicate(LDA.Types.Model_Topic_EM_Result mtr, UNSIGNED c) := TRANSFORM
     SELF.node := c;
     SELF := mtr;
   END;
@@ -95,7 +95,7 @@ EXPORT DATASET(LDA.Types.Document_Scored)
   cvg_docs := LOOP(mod_topic_docs,
                    LEFT.max_doc_iterations > LEFT.doc_iterations
                    AND LEFT.likelihood_change > LEFT.doc_epsilon,
-                   LDA.lda_inference(ROWS(LEFT), COUNTER));
+                   LDA.lda_inference_vi(ROWS(LEFT), COUNTER));
   // collect the results
   Document_Scored cvt2Scored(Doc_Topics doc) := TRANSFORM
     SELF.topics := doc.t_gammas;

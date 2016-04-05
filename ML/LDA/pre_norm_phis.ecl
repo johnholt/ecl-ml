@@ -7,20 +7,20 @@ EXPORT Types.Topic_Values_DataSet
                      Types.Topic_Value_DataSet t_digammas) := BEGINC++
   #ifndef ECL_LDA_ONLYVALUE
   #define ECL_LDA_ONLYVALUE
-  typedef  struct __attribute__ ((__packed__)) LDAOnlyValue {
+  struct __attribute__ ((__packed__)) LDAOnlyValue {
     double v;
   };
   #endif
   #ifndef ECL_LDA_TOPIC_VALUES
   #define ECL_LDA_TOPIC_VALUES
-  typedef  struct __attribute__ ((__packed__))  LDATopicValues {
+  struct __attribute__ ((__packed__))  LDATopicValues {
     uint32_t topic;
     size32_t sz_vs;   //array of Only Values follows of size sz_vs
   };
   #endif
   #ifndef ECL_LDA_TOPIC_VALUE
   #define ECL_LDA_TOPIC_VALUE
-  typedef  struct __attribute__ ((__packed__))  LDATopicValue {
+  struct __attribute__ ((__packed__))  LDATopicValue {
     uint32_t topic;
     double v;
   };
@@ -35,11 +35,11 @@ EXPORT Types.Topic_Values_DataSet
   size_t vs_size = num_words*sizeof(LDAOnlyValue);
   size_t fx_size = sizeof(LDATopicValues);
   const LDATopicValues* in_t_lb = (LDATopicValues*) t_logbetas;
-  const LDAOnlyValue* in_logbetas = (LDAOnlyValue*)(t_logbetas+fx_size);
+  const LDAOnlyValue* in_logbetas = (LDAOnlyValue*)(((uint8_t*)t_logbetas)+fx_size);
   __lenResult = lenT_logbetas;
   __result = rtlMalloc(__lenResult);
   LDATopicValues* t_phis = (LDATopicValues*) __result;
-  LDAOnlyValue* phis = (LDAOnlyValue*) (__result + fx_size);
+  LDAOnlyValue* phis = (LDAOnlyValue*) (((uint8_t*)__result) + fx_size);
   size_t consumed = 0;
   uint32_t curr_topic;
   for (curr_topic=0; curr_topic<num_topics; curr_topic++) {
@@ -51,10 +51,10 @@ EXPORT Types.Topic_Values_DataSet
       phis[w].v = exp(in_logbetas[w].v + in_t_digammas[curr_topic].v);
     }
     consumed += vs_size + fx_size;
-    in_t_lb = (LDATopicValues*)(t_logbetas + consumed);
-    in_logbetas = (LDAOnlyValue*)(t_logbetas + fx_size + consumed);
-    t_phis = (LDATopicValues*)(__result + consumed);
-    phis = (LDAOnlyValue*)(__result + fx_size + consumed);
+    in_t_lb = (LDATopicValues*)(((uint8_t*)t_logbetas) + consumed);
+    in_logbetas = (LDAOnlyValue*)(((uint8_t*)t_logbetas) + fx_size + consumed);
+    t_phis = (LDATopicValues*)(((uint8_t*)__result) + consumed);
+    phis = (LDAOnlyValue*)(((uint8_t*)__result) + fx_size + consumed);
   }
   // these phi arrays are ready
 ENDC++;

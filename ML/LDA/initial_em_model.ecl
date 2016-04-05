@@ -1,9 +1,10 @@
 // Convert the model parameters and document collection information into
 //an initial topic model for each model and topic in model
-IMPORT $.Types;
-Model_Rslt := Types.Model_Topic_Result;
+IMPORT $.Types AS Types;
+Model_Rslt := Types.Model_Topic_EM_Result;
 Model_init := Types.Model_Topic;
-Model_Parm := Types.Model_Parameters;
+Model_Parm := Types.EM_Model_Parameters;
+TermValue  := Types.TermValue;
 Model_Collection_Stats := Types.Model_Collection_Stats;
 /**
  * Convert model parameters and collection information into the initial
@@ -13,8 +14,8 @@ Model_Collection_Stats := Types.Model_Collection_Stats;
  * @param stats collection statistics needed for the model
  * @return the initial set of model-topic records
  */
-EXPORT DATASET(Types.Model_Topic_Result)
-       initial_model(DATASET(Types.Model_Parameters) models,
+EXPORT DATASET(Types.Model_Topic_EM_Result)
+    initial_em_model(DATASET(Types.EM_Model_Parameters) models,
                      DATASET(Types.Model_Topic) initial_values,
                      DATASET(Types.Model_Collection_Stats) stats) := FUNCTION
   // Convert parameters and apply document stats
@@ -44,15 +45,21 @@ EXPORT DATASET(Types.Model_Topic_Result)
     SELF.last_doc_max_iter := 0;
     SELF.last_alpha_df := 0;
     SELF.last_init_alpha := 0;
-    SELF.logbetas := [];                  // pick up from initial values
+    SELF.weights := [];                   // pick up from initial values
+    SELF.logBetas := [];                  // pick up from initial values
     SELF.topic := 0;                      // prime record
     SELF.hist := [];
   END;
   mod := JOIN(models, stats, LEFT.model=RIGHT.model, step1(LEFT,RIGHT), LOOKUP);
   // expand by topic
+  TermValue logBeta(TermValue tv) := TRANSFORM
+    SELF.v := LN(tv.v);
+    SELF.nominal := tv.nominal;
+  END;
   Model_Rslt step2(Model_Init init, Model_Rslt mod) := TRANSFORM
     SELF.topic := init.topic;
-    SELF.logBetas := init.logBetas;
+    SELF.weights := init.weights;
+    SELF.logBetas := PROJECT(init.weights, logBeta(LEFT));
     SELF.alpha := IF(init.alpha<>0, init.alpha, mod.alpha);
     SELF := mod;
   END;

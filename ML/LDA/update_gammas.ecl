@@ -5,27 +5,27 @@ EXPORT Types.Topic_Value_DataSet
                      Types.TermFreq_DataSet word_counts) := BEGINC++
   #ifndef ECL_LDA_ONLYVALUE
   #define ECL_LDA_ONLYVALUE
-  typedef  struct __attribute__ ((__packed__))  LDAOnlyValue {
+  struct __attribute__ ((__packed__))  LDAOnlyValue {
     double v;
   };
   #endif
   #ifndef ECL_LDA_TOPIC_VALUES
   #define ECL_LDA_TOPIC_VALUES
-  typedef  struct __attribute__ ((__packed__))  LDATopicValues {
+  struct __attribute__ ((__packed__))  LDATopicValues {
     uint32_t topic;
     size32_t sz_vs;   //array of Only Values follows of size sz_vs
   };
   #endif
   #ifndef ECL_LDA_TERMFREQ
   #define ECL_LDA_TERMFREQ
-  typedef struct __attribute__ ((__packed__)) LDATermFreq {
+  struct __attribute__ ((__packed__)) LDATermFreq {
     uint64_t nominal;
     uint32_t f;
   };
   #endif
   #ifndef ECL_LDA_TOPIC_VALUE
   #define ECL_LDA_TOPIC_VALUE
-  typedef  struct __attribute__ ((__packed__))  LDATopicValue {
+  struct __attribute__ ((__packed__))  LDATopicValue {
     uint32_t topic;
     double v;
   };
@@ -42,8 +42,8 @@ EXPORT Types.Topic_Value_DataSet
   __result = rtlMalloc(__lenResult);
   LDATopicValue* t_gammas = (LDATopicValue*) __result;
   while (consumed<lenT_phis && topic < num_topics) {
-    const LDATopicValues* in_t_phis = (LDATopicValues*) (t_phis + consumed);
-    const LDAOnlyValue* in_phis = (LDAOnlyValue*) (t_phis + fx_size + consumed);
+    const LDATopicValues* in_t_phis = (LDATopicValues*) (((uint8_t*)t_phis) + consumed);
+    const LDAOnlyValue* in_phis = (LDAOnlyValue*) (((uint8_t*)t_phis) + fx_size + consumed);
     if (in_t_phis->sz_vs!=vs_size) rtlFail(0,"Wrong number words");
     t_gammas[topic].topic = in_t_phis->topic;
     t_gammas[topic].v = alpha;

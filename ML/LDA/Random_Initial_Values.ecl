@@ -62,7 +62,7 @@ EXPORT DATASET(Types.Model_Topic)
   raw := NORMALIZE(model_topics, LEFT.unique_words, gen_nom(LEFT, COUNTER));
   t_sums := TABLE(raw, {model, topic, s:=SUM(GROUP,v)}, model, topic, MERGE);
   Work_Nominal norm_raw(Work_Nominal wn, RECORDOF(t_sums) tot) := TRANSFORM
-    SELF.v := LN(wn.v / tot.s);
+    SELF.v := wn.v / tot.s;
     SELF := wn;
   END;
   normalized := JOIN(raw, t_sums,
@@ -74,7 +74,7 @@ EXPORT DATASET(Types.Model_Topic)
     SELF.model := w.model;
     SELF.topic := w.topic;
     SELF.alpha := w.alpha;
-    SELF.logBetas := PROJECT(b, Types.TermValue);
+    SELF.weights := PROJECT(b, Types.TermValue);
   END;
   rslt := ROLLUP(grp_betas, GROUP, rollBetas(LEFT, ROWS(LEFT)));
   RETURN rslt;

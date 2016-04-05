@@ -1,15 +1,17 @@
 //Estimate the the topics for each model.  Roughly based upon
 //approach by Blei in LDA-C.
-IMPORT $;  // import the folder symbols
-IMPORT $.Types;
-IMPORT STD AS STD;
+IMPORT $ AS LDA;
+IMPORT $.Types AS Types;
+IMPORT STD;
 
 //Alias for convenience
-Doc_Assigned := Types.Doc_Assigned;
+Doc_Assigned := Types.Doc_Assigned_EM;
 Doc_Mapped := Types.Doc_Mapped;
-Doc_Topics := Types.Doc_Topics;
-Model_Parameters := Types.Model_Parameters;
+Doc_Topics := Types.Doc_Topics_EM;
+Model_Parameters := Types.EM_Model_Parameters;
 TermFreq_DataSet := Types.TermFreq_DataSet;
+log_gamma := LDA.log_gamma;
+digamma := LDA.digamma;
 // Alpha constraints
 MAX_ALPHA_ITER := 1000;
 ALPHA_THRESHOLD := 0.00001;
@@ -29,14 +31,14 @@ ALPHA_THRESHOLD := 0.00001;
  * @param docs the documents mapped to each model
  * @return model-topic level results and statistics
  */
-EXPORT DATASET(Types.Model_Topic_Result)
-       Topic_Estimation(DATASET(Types.Model_Parameters) parameters,
+EXPORT DATASET(Types.Model_Topic_EM_Result)
+    Topic_Estimation_EM(DATASET(Types.EM_Model_Parameters) parameters,
                         DATASET(Types.Model_Topic) initial_estimates,
                         DATASET(Types.Model_Collection_Stats) stats,
                         DATASET(Types.Doc_Mapped) docs) := FUNCTION
   // Assign docs to models
   Doc_Assigned assign_model(Doc_Mapped doc, Model_Parameters p):=TRANSFORM
-    tr := topic_ranges(p.num_topics, COUNT(doc.word_counts));
+    tr := LDA.topic_ranges(p.num_topics, COUNT(doc.word_counts));
     SELF.model := p.model;
     SELF.num_topics := p.num_topics;
     SELF.num_ranges := tr.ranges;
@@ -47,12 +49,12 @@ EXPORT DATASET(Types.Model_Topic_Result)
                    RIGHT.model IN LEFT.models,
                    assign_model(LEFT,RIGHT), ALL);  // model is a very small set
   // Initial version of the model from the parameters, collections, estimates
-  imr_0 := initial_model(parameters, initial_estimates, stats);
-  Work_Rslt := RECORD(Types.Model_Topic_Result)
+  imr_0 := LDA.initial_em_model(parameters, initial_estimates, stats);
+  Work_Rslt := RECORD(Types.Model_Topic_EM_Result)
     UNSIGNED2 node;
     UNSIGNED2 origin_node;
   END;
-  Work_Rslt replicate(Types.Model_Topic_Result mtr, UNSIGNED c) := TRANSFORM
+  Work_Rslt replicate(Types.Model_Topic_EM_Result mtr, UNSIGNED c) := TRANSFORM
     SELF.node := c-1;
     SELF.origin_node := STD.System.ThorLib.Node();
     SELF := mtr;
@@ -60,7 +62,7 @@ EXPORT DATASET(Types.Model_Topic_Result)
   imr_1 := NORMALIZE(imr_0, CLUSTERSIZE, replicate(LEFT, COUNTER));
   initial_model_results := SORT(DISTRIBUTE(imr_1, node), model, topic, LOCAL);
   //Generate the base model document topic set to be used in the doc inference
-  Types.Doc_Topics topicExpand(Doc_Assigned doc, UNSIGNED c) := TRANSFORM
+  Types.Doc_Topics_EM topicExpand(Doc_Assigned doc, UNSIGNED c) := TRANSFORM
     SELF.topic_range := c;
     SELF.topic_low := 1 + ((c-1)*doc.per_range);
     SELF.topic_high := MIN(doc.num_topics, c*doc.per_range);
@@ -91,7 +93,7 @@ EXPORT DATASET(Types.Model_Topic_Result)
     END;
     Types.Topic_Values cvtTV(Work_Rslt mod, TermFreq_DataSet wc) := TRANSFORM
       SELF.topic := mod.topic;
-      SELF.vs := select_betas(mod.logBetas, wc)
+      SELF.vs := LDA.select_betas(mod.logBetas, wc)
     END;
     Doc_Topics applyMTopic(Doc_Topics doc, DATASET(Work_Rslt) mts) := TRANSFORM
       base_topic := doc.topic_low-1;
@@ -117,7 +119,7 @@ EXPORT DATASET(Types.Model_Topic_Result)
     cvg_docs := LOOP(mod_topic_docs,
                      LEFT.max_doc_iterations > LEFT.doc_iterations
                      AND LEFT.likelihood_change > LEFT.doc_epsilon,
-                     lda_inference(ROWS(LEFT), COUNTER));
+                     LDA.lda_inference_vi(ROWS(LEFT), COUNTER));
     // Docs converged, now sum by topics within each model and calc new betas
     W_Cls_Word := RECORD
       Types.t_model_id model;
@@ -189,11 +191,12 @@ EXPORT DATASET(Types.Model_Topic_Result)
     END;
     model_alpha_ss := TABLE(doc_level_ss, W_Alpha, model, MERGE);
     Types.Alpha_Estimate cvt_2_ae(W_Alpha wrk) := TRANSFORM
+      REAL8 alpha := 100;
       SELF.last_df := 2 * ALPHA_THRESHOLD;
       SELF.iter := 0;
       SELF.init_alpha := 100;
-      SELF.alpha := EXP(LN(100));
-      SELF.log_alpha := LN(100);
+      SELF.alpha := alpha;
+      SELF.log_alpha := LN(alpha);
       SELF.suff_stat := wrk.alpha_sufstat;
       SELF := wrk;
     END;
@@ -201,7 +204,7 @@ EXPORT DATASET(Types.Model_Topic_Result)
     new_alpha := LOOP(alpha_ss,
                       ABS(LEFT.last_df)>ALPHA_THRESHOLD
                       AND LEFT.iter<MAX_ALPHA_ITER,
-                      update_alpha(ROWS(LEFT)));
+                      LDA.update_alpha(ROWS(LEFT)));
     Work_Rslt upd_alpha(Work_Rslt mod, Types.Alpha_Estimate alf) := TRANSFORM
       SELF.alpha := IF(mod.estimate_alpha, alf.alpha, mod.alpha);
       SELF.last_alpha_df := IF(mod.estimate_alpha, alf.last_df, 0.0);
@@ -254,7 +257,7 @@ EXPORT DATASET(Types.Model_Topic_Result)
       UNSIGNED2 doc_iter_min;
       UNSIGNED2 doc_iter_max;
     END;
-    Work_Doc_ex extractDoc(Types.Doc_Topics dt) := TRANSFORM
+    Work_Doc_ex extractDoc(Types.Doc_Topics_EM dt) := TRANSFORM
       converged := dt.likelihood_change BETWEEN 0.0 AND dt.doc_epsilon;
       SELF.model := dt.model;
       SELF.likelihood := dt.likelihood;
@@ -319,6 +322,14 @@ EXPORT DATASET(Types.Model_Topic_Result)
                       AND LEFT.likelihood_change > LEFT.beta_epsilon,
                       run_EM(ROWS(LEFT), COUNTER));
   // The results are replicated by node
-  result_models := SORT(node_models(node=origin_node), model, topic);
-  RETURN result_models;
+  result_models := node_models(node=origin_node); //SORT(node_models(node=origin_node), model, topic);
+  Types.TermValue exp_logBeta(Types.TermValue tv) := TRANSFORM
+    SELF.v := EXP(tv.v);
+    SELF.nominal := tv.nominal;
+  END;
+  Work_Rslt cvt_logBetas(Work_Rslt m) := TRANSFORM
+    SELF.weights := PROJECT(m.logBetas, exp_logBeta(LEFT));
+    SELF := m;
+  END;
+  RETURN PROJECT(result_models, cvt_logBetas(LEFT));
 END;

@@ -1,12 +1,12 @@
 // From Blei et al.
-IMPORT $;
-IMPORT Types FROM $;
+IMPORT $ AS LDA;
+IMPORT LDA.Types;
 // Work functions
 REAL8 d_alhood(REAL8 a, REAL8 ss, UNSIGNED4 D, UNSIGNED4 K)
-    := (D * (K * digamma(K * a) - K * digamma(a)) + ss);
+    := (D * (K * LDA.digamma(K * a) - K * LDA.digamma(a)) + ss);
 
 REAL8 d2_alhood(REAL8 a, UNSIGNED4 D, UNSIGNED4 K)
-    := (D * (K * K * trigamma(K * a) - K * trigamma(a)));
+    := (D * (K * K * LDA.trigamma(K * a) - K * LDA.trigamma(a)));
 
 Types.Alpha_Estimate upd(Types.Alpha_Estimate ae) := TRANSFORM
   REAL8 log_alpha_in := LN(ae.alpha);

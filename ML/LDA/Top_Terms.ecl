@@ -33,28 +33,24 @@ EXPORT Top_Terms(DATASET(Model_Topic) modl, DATASET(Term_Dict) dict) := MODULE
   SHARED Work_MT := RECORD
     LDA.Types.t_model_id model;
     LDA.Types.t_topic topic;
-    DATASET(TermValue) betas;
+    DATASET(TermValue) weights;
   END;
-  TermValue exp_beta(TermValue tv) := TRANSFORM
-    SELF.nominal := tv.nominal;
-    SELF.v := EXP(tv.v);
-  END;
-  Work_MT exp_betas(Model_Topic m) := TRANSFORM
-    SELF.betas := SORT(PROJECT(m.logBetas, exp_beta(LEFT)), -v);
+  Work_MT sort_weights(Model_Topic m) := TRANSFORM
+    SELF.weights := SORT(m.weights, -v, nominal);
     SELF := m;
   END;
-  mt0 := PROJECT(modl, exp_betas(LEFT));
+  mt0 := PROJECT(modl, sort_weights(LEFT));
   MTT flatten(Work_MT m, TermValue tv, UNSIGNED4 c):=TRANSFORM
     SELF.nominal := tv.nominal;
     SELF.v := tv.v;
     SELF.pos := c;
-    SELF.average := AVE(m.betas, v);
-    SELF.std_dev := SQRT(VARIANCE(m.betas, v));
-    SELF.near5_average := AVE(CHOOSEN(m.betas, 5, MAX(1,c-2)), v);
+    SELF.average := AVE(m.weights, v);
+    SELF.std_dev := SQRT(VARIANCE(m.weights, v));
+    SELF.near5_average := AVE(CHOOSEN(m.weights, 5, MAX(1,c-2)), v);
     SELF := m;
     SELF := [];
   END;
-  SHARED Flat_MTB := NORMALIZE(mt0, LEFT.betas, flatten(LEFT, RIGHT, COUNTER));
+  SHARED Flat_MTB := NORMALIZE(mt0, LEFT.weights, flatten(LEFT, RIGHT, COUNTER));
   SHARED Marked_MTB(UNSIGNED2 min_entries, REAL8 delta) := FUNCTION
     MTT mark(MTT next, MTT curr) := TRANSFORM
       SELF.sig_one := curr.pos > min_entries AND curr.v > delta * next.v;

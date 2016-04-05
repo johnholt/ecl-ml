@@ -1,7 +1,7 @@
 //     SUM(SUM(phi_nk (digamma(gamma_k)-digamma(SUM(gamma_k)))))
 //N.B., we use a compressed vector with count instead of a 0/1 vector
-IMPORT ML.LDA;
-IMPORT Types FROM $;
+IMPORT $ AS LDA;
+IMPORT $.Types AS Types;
 // convenient alias definitions
 Topic_Value := Types.Topic_Value;
 Topic_Values := Types.Topic_Values;
@@ -27,27 +27,27 @@ EXPORT REAL8 n_phi_gamma_sum(Types.Topic_Values_DataSet t_phis,
                              REAL8 digamma_gamma_sum) := BEGINC++
   #ifndef ECL_LDA_ONLYVALUE
   #define ECL_LDA_ONLYVALUE
-  typedef  struct __attribute__ ((__packed__))  LDAOnlyValue {
+  struct __attribute__ ((__packed__))  LDAOnlyValue {
     double v;
   };
   #endif
   #ifndef ECL_LDA_TOPIC_VALUES
   #define ECL_LDA_TOPIC_VALUES
-  typedef  struct __attribute__ ((__packed__))  LDATopicValues {
+  struct __attribute__ ((__packed__))  LDATopicValues {
     uint32_t topic;
     size32_t sz_vs;   //array of Only Values follows of size sz_vs
   };
   #endif
   #ifndef ECL_LDA_TERMFREQ
   #define ECL_LDA_TERMFREQ
-  typedef struct __attribute__ ((__packed__)) LDATermFreq {
+  struct __attribute__ ((__packed__)) LDATermFreq {
     uint64_t nominal;
     uint32_t f;
   };
   #endif
   #ifndef ECL_LDA_TOPIC_VALUE
   #define ECL_LDA_TOPIC_VALUE
-  typedef  struct __attribute__ ((__packed__))  LDATopicValue {
+  struct __attribute__ ((__packed__))  LDATopicValue {
     uint32_t topic;
     double v;
   };
@@ -65,11 +65,11 @@ EXPORT REAL8 n_phi_gamma_sum(Types.Topic_Values_DataSet t_phis,
   double rslt = 0.0;
   size_t consumed = 0;
   while (consumed < lenT_phis && topicx < num_topics) {
-    const LDATopicValues* in_t_phis = (LDATopicValues*) (t_phis + consumed);
+    const LDATopicValues* in_t_phis = (LDATopicValues*) (((uint8_t*)t_phis) + consumed);
     if(in_t_phis->topic!=in_t_digammas[topicx].topic) {
       rtlFail(0, "topic id mismatch");
     }
-    const LDAOnlyValue* in_phis = (LDAOnlyValue*) (t_phis + fx_size + consumed);
+    const LDAOnlyValue* in_phis = (LDAOnlyValue*) (((uint8_t*)t_phis) + fx_size + consumed);
     if (in_t_phis->sz_vs!=vs_size) rtlFail(0, "Words and Phis not the same");
     double digamma_diff = in_t_digammas[topicx].v - digamma_gamma_sum;
     for (uint32_t word=0; word<words; word++) {

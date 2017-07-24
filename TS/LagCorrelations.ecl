@@ -2,7 +2,7 @@
 //of specified lags.
 IMPORT TS;
 IMPORT TS.Types;
-IMPORT PBblas;
+IMPORT PBblas_v0;
 //intermediate structs
 LagRec := RECORD
   Types.t_model_id model_id;
@@ -23,7 +23,7 @@ ACF_Rec := RECORD
   REAL8 sum_sq;       // sum of r-squared, k-1 of them
   UNSIGNED4 N;
 END;
-Cell := RECORD(PBblas.Types.Layout_Cell)
+Cell := RECORD(PBblas_v0.Types.Layout_Cell)
   Types.t_model_id model_id;
   UNSIGNED2 lags;
 END;

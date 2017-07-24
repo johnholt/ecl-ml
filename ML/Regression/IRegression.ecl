@@ -3,7 +3,7 @@
 IMPORT ML;
 IMPORT ML.Types;
 IMPORT ML.Mat AS Mat;
-IMPORT PBblas.Types AS DMatTypes;
+IMPORT PBblas_v0.Types AS DMatTypes;
 IMPORT ML.Mat.Types AS MatTypes;
 NumericField := Types.NumericField;
 /*

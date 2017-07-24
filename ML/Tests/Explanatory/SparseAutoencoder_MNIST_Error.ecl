@@ -1,10 +1,10 @@
 ﻿IMPORT ML;
 IMPORT ML.Types AS Types;
-IMPORT PBblas;
-Layout_Cell := PBblas.Types.Layout_Cell;
-IMPORT PBblas;
+IMPORT PBblas_v0;
+Layout_Cell := PBblas_v0.Types.Layout_Cell;
+IMPORT PBblas_v0;
 
-Layout_Part := PBblas.Types.Layout_Part;
+Layout_Part := PBblas_v0.Types.Layout_Part;
 //Number of neurons in the last layer is number of output assigned to each sample
 INTEGER4 hl := 1;//number of nodes in the hiddenlayer
 INTEGER4 f := 784;//number of input features
@@ -1629,10 +1629,10 @@ m := MAX (d, d.y); //number of samples
 m_1 := 1/m;
 
    sizeRec := RECORD
-      PBblas.Types.dimension_t m_rows;
-      PBblas.Types.dimension_t m_cols;
-      PBblas.Types.dimension_t f_b_rows;
-      PBblas.Types.dimension_t f_b_cols;
+      PBblas_v0.Types.dimension_t m_rows;
+      PBblas_v0.Types.dimension_t m_cols;
+      PBblas_v0.Types.dimension_t f_b_rows;
+      PBblas_v0.Types.dimension_t f_b_cols;
     END;
    //Map for Matrix d.
      havemaxrow := maxrows > 0;
@@ -1642,44 +1642,44 @@ m_1 := 1/m;
      d_n := dstats.XMax;
      d_m := dstats.YMax;
      output_num := d_n;
-    derivemap := PBblas.AutoBVMap(d_n, d_m,prows,pcols);
+    derivemap := PBblas_v0.AutoBVMap(d_n, d_m,prows,pcols);
      sizeTable := DATASET([{derivemap.matrix_rows,derivemap.matrix_cols,derivemap.part_rows(1),derivemap.part_cols(1)}], sizeRec);
     //Create block matrix d
-    dmap := PBblas.Matrix_Map(sizeTable[1].m_rows,sizeTable[1].m_cols,sizeTable[1].f_b_rows,sizeTable[1].f_b_cols);
+    dmap := PBblas_v0.Matrix_Map(sizeTable[1].m_rows,sizeTable[1].m_cols,sizeTable[1].f_b_rows,sizeTable[1].f_b_cols);
     ddist := ML.DMAT.Converted.FromElement(d,dmap);
     //Creat block matrices for weights
     w1_mat := ML.Mat.MU.From(IntW,1);
     w1_mat_x := ML.Mat.Has(w1_mat).Stats.Xmax;
     w1_mat_y := ML.Mat.Has(w1_mat).Stats.Ymax;
-    w1map := PBblas.Matrix_Map(w1_mat_x, w1_mat_y, sizeTable[1].f_b_rows, sizeTable[1].f_b_rows);
+    w1map := PBblas_v0.Matrix_Map(w1_mat_x, w1_mat_y, sizeTable[1].f_b_rows, sizeTable[1].f_b_rows);
     w1dist := ML.DMAT.Converted.FromElement(w1_mat,w1map);
     w2_mat := ML.Mat.MU.From(IntW,2);
     w2_mat_x := w1_mat_y;
     w2_mat_y := w1_mat_x;
-    w2map := PBblas.Matrix_Map(w2_mat_x, w2_mat_y, sizeTable[1].f_b_rows, sizeTable[1].f_b_rows);
+    w2map := PBblas_v0.Matrix_Map(w2_mat_x, w2_mat_y, sizeTable[1].f_b_rows, sizeTable[1].f_b_rows);
     w2dist := ML.DMAT.Converted.FromElement(w2_mat,w2map);
     //each bias vector is converted to block format
     b1vec := ML.Mat.MU.From(Intb,1);
     b1vec_x := ML.Mat.Has(b1vec).Stats.Xmax;
-    b1vecmap := PBblas.Matrix_Map(b1vec_x, 1, sizeTable[1].f_b_rows, 1);
+    b1vecmap := PBblas_v0.Matrix_Map(b1vec_x, 1, sizeTable[1].f_b_rows, 1);
     b1vecdist := ML.DMAT.Converted.FromElement(b1vec,b1vecmap);
     b2vec := ML.Mat.MU.From(Intb,2);
     b2vec_x := ML.Mat.Has(b2vec).Stats.Xmax;
-    b2vecmap := PBblas.Matrix_Map(b2vec_x, 1, sizeTable[1].f_b_rows, 1);
+    b2vecmap := PBblas_v0.Matrix_Map(b2vec_x, 1, sizeTable[1].f_b_rows, 1);
     b2vecdist := ML.dMat.Converted.FromElement(b2vec,b2vecmap);
 
     //functions used
-    PBblas.Types.value_t siggrad(PBblas.Types.value_t v, PBblas.Types.dimension_t r, PBblas.Types.dimension_t c) := v*(1.0-v);
-    PBblas.Types.value_t sigmoid(PBblas.Types.value_t v, PBblas.Types.dimension_t r, PBblas.Types.dimension_t c) := 1/(1+exp(-1*v));
+    PBblas_v0.Types.value_t siggrad(PBblas_v0.Types.value_t v, PBblas_v0.Types.dimension_t r, PBblas_v0.Types.dimension_t c) := v*(1.0-v);
+    PBblas_v0.Types.value_t sigmoid(PBblas_v0.Types.value_t v, PBblas_v0.Types.dimension_t r, PBblas_v0.Types.dimension_t c) := 1/(1+exp(-1*v));
     //maps used
-    b1map := PBblas.Matrix_Map(b1vec_x, m, sizeTable[1].f_b_rows, sizeTable[1].f_b_cols);
-    b2map := PBblas.Matrix_Map(b2vec_x, m, sizeTable[1].f_b_rows, sizeTable[1].f_b_cols);
+    b1map := PBblas_v0.Matrix_Map(b1vec_x, m, sizeTable[1].f_b_rows, sizeTable[1].f_b_cols);
+    b2map := PBblas_v0.Matrix_Map(b2vec_x, m, sizeTable[1].f_b_rows, sizeTable[1].f_b_cols);
     a2map := b1map;
     a3map := b2map;
     HL_nodes := w1_mat_x;//number of nodes in the hidden layer
     Hiddmap := b1vecmap;
     //onevec for calculating rhohat
-    Ones_VecMap := PBblas.Matrix_Map(m, 1, sizeTable[1].f_b_cols, 1);
+    Ones_VecMap := PBblas_v0.Matrix_Map(m, 1, sizeTable[1].f_b_cols, 1);
     //New Vector Generator
     Layout_Cell gen(UNSIGNED4 c, UNSIGNED4 NumRows) := TRANSFORM
       SELF.x := ((c-1) % NumRows) + 1;
@@ -1692,21 +1692,21 @@ m_1 := 1/m;
     
     //output of the first layer
     //b1m = repmat(b1v,1,m)
-    b1m := PBblas.PB_dgemm(FALSE, TRUE, 1.0,b1vecmap, b1vecdist, Ones_VecMap, Ones_Vecdist, b1map);
+    b1m := PBblas_v0.PB_dgemm(FALSE, TRUE, 1.0,b1vecmap, b1vecdist, Ones_VecMap, Ones_Vecdist, b1map);
     //z2 = w1*X+b1;
-    z2 := PBblas.PB_dgemm(FALSE, FALSE, 1.0,w1map, w1dist, dmap, ddist, b1map, b1m, 1.0);
+    z2 := PBblas_v0.PB_dgemm(FALSE, FALSE, 1.0,w1map, w1dist, dmap, ddist, b1map, b1m, 1.0);
     //a2 = sigmoid (z2);
-    a2 := PBblas.Apply2Elements(b1map, z2, sigmoid);
+    a2 := PBblas_v0.Apply2Elements(b1map, z2, sigmoid);
     OUTPUT (a2, NAMED('a2'));//a2 is a 10*784 matrix
     //output of the second layer
    //b2m = repmat(b2v,1,m)
    //b2m = (matrix of size 784*1 ) * ( matrix of size 1*60000) 
-    b2m := PBblas.PB_dgemm(FALSE, TRUE, 1.0,b2vecmap, b2vecdist, Ones_VecMap, Ones_Vecdist, b2map);
+    b2m := PBblas_v0.PB_dgemm(FALSE, TRUE, 1.0,b2vecmap, b2vecdist, Ones_VecMap, Ones_Vecdist, b2map);
     //z3 = w2dist*a2+b2m;
-    //z3 := PBblas.PB_dgemm(FALSE, FALSE,1.0,w2map, w2dist, a2map, a2, b2map,b2m, 1.0);
+    //z3 := PBblas_v0.PB_dgemm(FALSE, FALSE,1.0,w2map, w2dist, a2map, a2, b2map,b2m, 1.0);
     
-    z3_tmp := PBblas.PB_dgemm(FALSE, FALSE,1.0,w2map, w2dist, a2map, a2, b2map);
-    z3 := PBblas.PB_daxpy(1.0, z3_tmp, b2m);
+    z3_tmp := PBblas_v0.PB_dgemm(FALSE, FALSE,1.0,w2map, w2dist, a2map, a2, b2map);
+    z3 := PBblas_v0.PB_daxpy(1.0, z3_tmp, b2m);
       
     z3_matrix := ML.dMat.Converted.FromPart2Elm (z3);
     z3_rows := ML.Mat.Has(z3_matrix).Stats.Ymax;

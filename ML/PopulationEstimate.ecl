@@ -1,7 +1,7 @@
 ﻿// Population Estmates of samples
 IMPORT ML;
 IMPORT ML.Mat AS Mat;
-IMPORT PBblas;
+IMPORT PBblas_v0;
 IMPORT STD;
 EXPORT PopulationEstimate := MODULE
 /*
@@ -277,15 +277,15 @@ EXPORT ConcordV2Blas(DATASET(Mat.Types.Element) Y, REAL8 lambda, INTEGER8 maxIte
   p:= MAX(Y,y); //number of variables
   n:= MAX(Y,x); //number of observations
   partts:= STD.System.Thorlib.nodes(); //number of nodes  
-  PBblas.Types.value_t ScalebyN(PBblas.Types.value_t v,
-                                      PBblas.Types.dimension_t r,
-                                      PBblas.Types.dimension_t c) := v/n;
+  PBblas_v0.Types.value_t ScalebyN(PBblas_v0.Types.value_t v,
+                                      PBblas_v0.Types.dimension_t r,
+                                      PBblas_v0.Types.dimension_t c) := v/n;
   Ydivisor:= ((p-1) DIV partts)+1;
-  Ymap:= PBblas.Matrix_Map(n,p,Ydivisor,Ydivisor);
-  Omap:= PBblas.Matrix_Map(p,p,Ydivisor,Ydivisor);  
+  Ymap:= PBblas_v0.Matrix_Map(n,p,Ydivisor,Ydivisor);
+  Omap:= PBblas_v0.Matrix_Map(p,p,Ydivisor,Ydivisor);
   Y_cc:= ML.Dmat.Converted.FromElement(Y,Ymap);
-  YTY:= PBblas.PB_dgemm(TRUE, FALSE, 1.0, Ymap, Y_cc, Ymap, Y_cc, Omap);
-  Sblas:= PBblas.Apply2Elements(Omap, YTY, ScalebyN);
+  YTY:= PBblas_v0.PB_dgemm(TRUE, FALSE, 1.0, Ymap, Y_cc, Ymap, Y_cc, Omap);
+  Sblas:= PBblas_v0.Apply2Elements(Omap, YTY, ScalebyN);
   S:= ML.Dmat.Converted.FromPart2Elm(Sblas);
   O:= Mat.Identity(p);  
   OmegaType := ENUM(UNSIGNED1, Unknown=0, Om, OldOm, Residual, IterCnt);    
@@ -323,9 +323,9 @@ EXPORT ConcordV2Blas(DATASET(Mat.Types.Element) Y, REAL8 lambda, INTEGER8 maxIte
     SELF.y := b.y;
     SELF.value := SUM(cells, value);
   END;  
-  PBblas.Types.value_t MatDiagInv(PBblas.Types.value_t v,
-                                      PBblas.Types.dimension_t r,
-                                      PBblas.Types.dimension_t c) := IF(r=c,1/v,0);
+  PBblas_v0.Types.value_t MatDiagInv(PBblas_v0.Types.value_t v,
+                                      PBblas_v0.Types.dimension_t r,
+                                      PBblas_v0.Types.dimension_t c) := IF(r=c,1/v,0);
   OmegaElement updateOmega(DATASET(OmegaElement) new1) := FUNCTION
     unchanged_cells_new:=new1(typ<>OmegaType.OldOm);
     new_mat := PROJECT(new1(typ=OmegaType.Om), ML.Mat.Types.Element);
@@ -416,17 +416,17 @@ EXPORT ConcordV2Blas(DATASET(Mat.Types.Element) Y, REAL8 lambda, INTEGER8 maxIte
   OuterOuterBody2(DATASET(OmegaElement) work_O, UNSIGNED4 cnt):= FUNCTION
       //residual calculation
     divisor:= ((p-1) DIV partts)+1;
-    map1:= PBblas.Matrix_Map(n,p,divisor,divisor);
-    map2:= PBblas.Matrix_Map(p,p,divisor,divisor);        
+    map1:= PBblas_v0.Matrix_Map(n,p,divisor,divisor);
+    map2:= PBblas_v0.Matrix_Map(p,p,divisor,divisor);
     work_Omega:= updateOmega(work_O);
     work_Om:= PROJECT(work_O(typ=OmegaType.Om), ML.Mat.Types.Element);
     Y_c:= ML.Dmat.Converted.FromElement(Y,map1);
     work_Om_c:= ML.Dmat.Converted.FromElement(work_Om,map2);
-    omega_tilde:= PBblas.Apply2Elements(map1, work_Om_c, MatDiagInv);
-    newomega:= PBblas.PB_dgemm(FALSE, FALSE,
+    omega_tilde:= PBblas_v0.Apply2Elements(map1, work_Om_c, MatDiagInv);
+    newomega:= PBblas_v0.PB_dgemm(FALSE, FALSE,
                              1.0, map2, work_Om_c, map2, omega_tilde,
                              map2);
-    residuals_c:=  PBblas.PB_dgemm(FALSE, FALSE,
+    residuals_c:=  PBblas_v0.PB_dgemm(FALSE, FALSE,
                              1.0, map1, Y_c, map2, newomega,
                              map1);
     residuals:= ML.Dmat.Converted.FromPart2Elm(residuals_c);  

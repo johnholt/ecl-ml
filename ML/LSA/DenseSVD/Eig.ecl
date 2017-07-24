@@ -1,12 +1,12 @@
 ﻿IMPORT $ AS DenseSVD;
 IMPORT Config FROM ML;
 IMPORT ML.DMat AS DMat;
-IMPORT PBblas;
-IMPORT PBblas.Types AS Types;
-IMPORT PBblas.MU AS MU;
+IMPORT PBblas_v0;
+IMPORT PBblas_v0.Types AS Types;
+IMPORT PBblas_v0.MU AS MU;
 
 Part := Types.Layout_Part;
-IMatrix_Map := PBblas.IMatrix_Map;
+IMatrix_Map := PBblas_v0.IMatrix_Map;
 
 EXPORT eig(IMatrix_Map a_map, DATASET(Part) A, UNSIGNED4 iter=200) := MODULE
   SHARED eig_comp := ENUM ( T = 1, Q = 2, T0 = 3 );
@@ -20,7 +20,7 @@ EXPORT eig(IMatrix_Map a_map, DATASET(Part) A, UNSIGNED4 iter=200) := MODULE
     CheckConv(DATASET(Types.MUElement) ds, UNSIGNED4 k) := FUNCTION
       Tnew := MU.From(ds, eig_comp.T);
       Told := MU.From(ds, eig_comp.T0);
-      diff := PBblas.PB_daxpy(-1.0, Tnew, Told);
+      diff := PBblas_v0.PB_daxpy(-1.0, Tnew, Told);
       bConv := DenseSVD.Helpers.NormDiag(a_map, diff)/DenseSVD.Helpers.NormDiag(a_map, Told);
       RETURN bConv > 0.0001;
     END;
@@ -43,7 +43,7 @@ EXPORT eig(IMatrix_Map a_map, DATASET(Part) A, UNSIGNED4 iter=200) := MODULE
                     , loopBody(ROWS(LEFT), COUNTER));
   END;
 
-  EXPORT valuesM := PBblas.HadamardProduct(a_map, DMat.Identity(a_map), MU.From(QRalgorithm(), eig_comp.T));
+  EXPORT valuesM := PBblas_v0.HadamardProduct(a_map, DMat.Identity(a_map), MU.From(QRalgorithm(), eig_comp.T));
   EXPORT vectors := MU.From(QRalgorithm(), eig_comp.Q);
 
 END;

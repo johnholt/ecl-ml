@@ -1,13 +1,13 @@
-﻿IMPORT PBblas;
-IMPORT PBblas.Types AS Types;
-IMPORT PBblas.MU AS MU;
-IMPORT PBblas.Block;
+﻿IMPORT PBblas_v0;
+IMPORT PBblas_v0.Types AS Types;
+IMPORT PBblas_v0.MU AS MU;
+IMPORT PBblas_v0.Block;
 
 Part := Types.Layout_Part;
-IMatrix_Map := PBblas.IMatrix_Map;
-matrix_t := PBblas.Types.matrix_t;
-dimension_t := PBblas.Types.dimension_t;
-value_t := PBblas.Types.value_t;
+IMatrix_Map := PBblas_v0.IMatrix_Map;
+matrix_t := PBblas_v0.Types.matrix_t;
+dimension_t := PBblas_v0.Types.dimension_t;
+value_t := PBblas_v0.Types.value_t;
 
 EXPORT Helpers := MODULE
   SHARED value_t onenorm(dimension_t m, dimension_t n, matrix_t x) := FUNCTION

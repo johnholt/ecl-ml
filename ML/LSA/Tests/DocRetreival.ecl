@@ -1,12 +1,12 @@
 ﻿IMPORT ML;
 IMPORT ML.Mat AS Mat;
 IMPORT ML.DMat AS DMat;
-IMPORT PBblas;
+IMPORT PBblas_v0;
 
 a := DATASET('~lsa::bbc_train.mtx', Mat.Types.Element, CSV);
 a_rows := MAX(a, x);
 a_cols := MAX(a, y);
-a_map := PBblas.Matrix_Map(a_rows, a_cols, MIN(PBblas.Constants.Block_Vec_Rows, a_rows), a_cols);
+a_map := PBblas_v0.Matrix_Map(a_rows, a_cols, MIN(PBblas_v0.Constants.Block_Vec_Rows, a_rows), a_cols);
 Da := DMat.Converted.FromElement(a, a_map);
 decomp := ML.LSA.lsa.StandardSVD(a_map, Da, 50);
 
@@ -18,7 +18,7 @@ L := PROJECT(labels, TRANSFORM(Mat.Types.Element, SELF.x := COUNTER; SELF.y := 1
 test1 := DATASET('~lsa::bbc_test.mtx', Mat.Types.Element, CSV);
 test_rows := a_rows;
 test_cols := MAX(test1, y);
-test_map := PBblas.Matrix_Map(test_rows, test_cols, MIN(PBblas.Constants.Block_Vec_Rows, test_rows), test_cols);
+test_map := PBblas_v0.Matrix_Map(test_rows, test_cols, MIN(PBblas_v0.Constants.Block_Vec_Rows, test_rows), test_cols);
 Dtest := DMat.Converted.FromElement(test1, test_map);
 test_V := ML.LSA.lsa.ComputeQueryVectors(decomp, test_map, Dtest);
 

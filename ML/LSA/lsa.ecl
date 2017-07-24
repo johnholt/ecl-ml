@@ -1,15 +1,15 @@
 ﻿IMPORT ML;
 IMPORT ML.Mat AS Mat;
 IMPORT ML.DMat AS DMat;
-IMPORT PBblas;
+IMPORT PBblas_v0;
 
-value_t := PBblas.Types.value_t;
-dimension_t := PBblas.Types.dimension_t;
-partition_t := PBblas.Types.partition_t;
+value_t := PBblas_v0.Types.value_t;
+dimension_t := PBblas_v0.Types.dimension_t;
+partition_t := PBblas_v0.Types.partition_t;
 ToElm := DMat.Converted.FromPart2Elm;
 FromElm := DMat.Converted.FromElement;
-Part := PBblas.Types.Layout_Part;
-IMatrix_Map := PBblas.IMatrix_Map;
+Part := PBblas_v0.Types.Layout_Part;
+IMatrix_Map := PBblas_v0.IMatrix_Map;
 
 EXPORT lsa := MODULE
 
@@ -18,10 +18,10 @@ EXPORT lsa := MODULE
     RETURN ML.LSA.DenseSVD.SVD(a_map, A).decomp;
   END;
   
-  EXPORT ReduceRank(DATASET(PBblas.Types.MUElement) decomp, UNSIGNED4 r) := FUNCTION
-    U := ToElm(PBblas.MU.From(decomp, mat_type.U));
-    S := ToElm(PBblas.MU.From(decomp, mat_type.S));
-    V := ToElm(PBblas.MU.From(decomp, mat_type.V));
+  EXPORT ReduceRank(DATASET(PBblas_v0.Types.MUElement) decomp, UNSIGNED4 r) := FUNCTION
+    U := ToElm(PBblas_v0.MU.From(decomp, mat_type.U));
+    S := ToElm(PBblas_v0.MU.From(decomp, mat_type.S));
+    V := ToElm(PBblas_v0.MU.From(decomp, mat_type.V));
     F := SET(TOPN(S, r, -value), y);
     Ur := U(y in F);
     Sr := S(y in F, x=y);
@@ -39,13 +39,13 @@ EXPORT lsa := MODULE
     S := Mat.Each.Each_Reciprocal(Mat.MU.From(decomp, mat_type.S));
     dims := [MAX(U, x), MAX(U, y), MAX(S, x), MAX(S, y)];
     qT_map := DMat.Trans.TranMap(q_map);
-    u_map := PBblas.Matrix_map(dims[1], dims[2], qT_map.part_cols(1), dims[2]);
-    s_map := PBblas.Matrix_map(dims[3], dims[4], u_map.part_cols(1), dims[4]);
-    nk_map := PBBlas.Matrix_Map(q_map.matrix_cols, u_map.matrix_cols, q_map.part_cols(1), u_map.part_cols(1));
+    u_map := PBblas_v0.Matrix_map(dims[1], dims[2], qT_map.part_cols(1), dims[2]);
+    s_map := PBblas_v0.Matrix_map(dims[3], dims[4], u_map.part_cols(1), dims[4]);
+    nk_map := PBblas_v0.Matrix_Map(q_map.matrix_cols, u_map.matrix_cols, q_map.part_cols(1), u_map.part_cols(1));
     dU := FromElm(U, u_map);
     dS := FromElm(S, s_map);
-    US := PBBlas.PB_dgemm(FALSE, FALSE, 1.0, u_map, dU, s_map, dS, u_map);
-    TQUS := PBBlas.PB_dgemm(TRUE, FALSE, 1.0, q_map, Q, u_map, US, nk_map);
+    US := PBblas_v0.PB_dgemm(FALSE, FALSE, 1.0, u_map, dU, s_map, dS, u_map);
+    TQUS := PBblas_v0.PB_dgemm(TRUE, FALSE, 1.0, q_map, Q, u_map, US, nk_map);
     QVec := ToElm(TQUS);
     RETURN QVec;
   END;

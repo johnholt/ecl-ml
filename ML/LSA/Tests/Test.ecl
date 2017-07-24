@@ -2,7 +2,7 @@
 IMPORT ML.Mat AS Mat;
 IMPORT ML.Docs AS Docs;
 IMPORT ML.LSA as LSA;
-IMPORT PBblas;
+IMPORT PBblas_v0;
 IMPORT ML.DMat AS DMat;
 
 d := DATASET([{'Shipment of Gold damaged in a fire'},
@@ -22,7 +22,7 @@ w2 := Docs.Trans(w1).WordBag;
 doc_mat := PROJECT(w2, TRANSFORM(Mat.Types.Element, SELF.x := LEFT.word; SELF.y := LEFT.id; SELF.value := LEFT.words_in_doc));
 a_rows := MAX(doc_mat, x);
 a_cols := MAX(doc_mat, y);
-a_map := PBblas.Matrix_Map(a_rows, a_cols, MIN(PBblas.Constants.Block_Vec_Rows, a_rows), a_cols);
+a_map := PBblas_v0.Matrix_Map(a_rows, a_cols, MIN(PBblas_v0.Constants.Block_Vec_Rows, a_rows), a_cols);
 Da := DMat.Converted.FromElement(doc_mat, a_map);
 
 decomp := LSA.lsa.StandardSVD(a_map, Da, 2);
@@ -39,7 +39,7 @@ qw := Docs.Trans(Docs.Tokenize.ToO(q4, lex)).WordBag;
 q_mat := PROJECT(qw, TRANSFORM(Mat.Types.Element, SELF.x := LEFT.word; SELF.y := LEFT.id; SELF.value := LEFT.words_in_doc));
 q_rows := a_rows;
 q_cols := MAX(q_mat, y);
-q_map := PBblas.Matrix_Map(q_rows, q_cols, MIN(PBblas.Constants.Block_Vec_Rows, q_rows), q_cols);
+q_map := PBblas_v0.Matrix_Map(q_rows, q_cols, MIN(PBblas_v0.Constants.Block_Vec_Rows, q_rows), q_cols);
 Dq := DMat.Converted.FromElement(q_mat, q_map);
 
 //Reduced Query Vector

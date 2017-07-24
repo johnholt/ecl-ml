@@ -1,6 +1,6 @@
 ﻿// Model Identification.  Produces autocorrelation function and
 //the partial autocorrelation function datasets.
-IMPORT PBblas;
+IMPORT PBblas_v0;
 IMPORT TS.Types;
 IMPORT TS;
 ModelObs := Types.ModelObs;
@@ -26,7 +26,7 @@ EXPORT Identification(DATASET(Types.UniObservation) series,
     REAL8 sum_sq;       // sum of r-squared, k-1 of them
     UNSIGNED4 N;
   END;
-  SHARED Cell := RECORD(PBblas.Types.Layout_Cell)
+  SHARED Cell := RECORD(PBblas_v0.Types.Layout_Cell)
     Types.t_model_id model_id;
   END;
   // Formulae from Bowerman & O'Connell, Forecasting and Time Series, 1979

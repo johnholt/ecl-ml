@@ -1,7 +1,7 @@
 ﻿IMPORT ML;
 IMPORT ML.Types AS Types;
-IMPORT PBblas;
-Layout_Cell := PBblas.Types.Layout_Cell;
+IMPORT PBblas_v0;
+Layout_Cell := PBblas_v0.Types.Layout_Cell;
 //Number of neurons in the last layer is number of output assigned to each sample
 INTEGER4 hl := 3;//number of nodes in the hiddenlayer
 INTEGER4 f := 20;//number of input features

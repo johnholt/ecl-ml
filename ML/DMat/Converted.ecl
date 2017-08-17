@@ -3,8 +3,8 @@
 //First row and first column are one based.
 //Insert is used insert columns with a spacific value.  Typical use is building a matrix
 // for a solver where the first column is an inserted column of 1 values for the intercept.
-IMPORT PBblas;
-IMPORT PBblas.Types AS Types;
+IMPORT PBblas_v0;
+IMPORT PBblas_v0.Types AS Types;
 Layout_Part := Types.Layout_Part;
 Layout_Cell := Types.Layout_Cell;
 IMPORT ML.Types AS ML_Types;
@@ -17,7 +17,7 @@ EXPORT Converted := MODULE
     Types.dimension_t     block_row;
     Types.dimension_t     block_col;
   END;
-  EXPORT FromCells(PBblas.IMatrix_Map mat_map, DATASET(Layout_Cell) cells,
+  EXPORT FromCells(PBblas_v0.IMatrix_Map mat_map, DATASET(Layout_Cell) cells,
                    Types.dimension_t insert_columns=0,
                    Types.value_t insert_value=0.0d) := FUNCTION
     Work1 cvt_2_xcell(Layout_Cell lr) := TRANSFORM
@@ -41,7 +41,7 @@ EXPORT Converted := MODULE
       first_col     := mat_map.first_col(parent.partition_id);
       part_rows     := mat_map.part_rows(parent.partition_id);
       part_cols     := mat_map.part_cols(parent.partition_id);
-      SELF.mat_part := PBblas.MakeR8Set(part_rows, part_cols, first_row, first_col,
+      SELF.mat_part := PBblas_v0.MakeR8Set(part_rows, part_cols, first_row, first_col,
                                         PROJECT(cells, Layout_Cell),
                                         insert_columns, insert_value);
       SELF.partition_id:= parent.partition_id;
@@ -70,7 +70,7 @@ EXPORT Converted := MODULE
 
   // From ML Types
   EXPORT FromNumericFieldDS(DATASET(ML_Types.NumericField) cells,
-                           PBblas.IMatrix_Map mat_map,
+                           PBblas_v0.IMatrix_Map mat_map,
                            Types.dimension_t insert_columns=0,
                            Types.value_t insert_value=0.0d) := FUNCTION
     Layout_Cell cvt_2_cell(ML_Types.NumericField lr) := TRANSFORM
@@ -98,7 +98,7 @@ EXPORT Converted := MODULE
     SELF    := elm;
   END;
   EXPORT FromElement(DATASET(Mat_Types.Element) elms,
-                     PBblas.IMatrix_Map mat_map,
+                     PBblas_v0.IMatrix_Map mat_map,
                      Types.dimension_t ins_cols=0,
                      Types.value_t ins_val=0.0d)
         := FromCells(mat_map, PROJECT(elms, cvt(LEFT)), ins_cols, ins_val);

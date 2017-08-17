@@ -11,11 +11,11 @@ IMPORT ML;
 IMPORT ML.Types AS Types;
 IMPORT Std.Str ;
 IMPORT ML.mat as Mat;
-IMPORT PBblas as PBblas;
+IMPORT PBblas_v0 as PBblas_v0;
 IMPORT ML.DMat as DMat;
-NotCompat := PBblas.Constants.Dimension_Incompat;
-Matrix_Map:= PBblas.Matrix_Map;
-Part      := PBblas.Types.Layout_Part;
+NotCompat := PBblas_v0.Constants.Dimension_Incompat;
+Matrix_Map:= PBblas_v0.Matrix_Map;
+Part      := PBblas_v0.Types.Layout_Part;
 NumericField := Types.NumericField;
 
 EXPORT OLS(DATASET(NumericField) X,DATASET(NumericField) Y)
@@ -27,7 +27,7 @@ EXPORT OLS(DATASET(NumericField) X,DATASET(NumericField) Y)
   SHARED x_cols:= MAX(X, number) + 1;    // add constant for intercept
   SHARED y_rows:= MAX(Y, id);
   SHARED y_cols:= MAX(Y, number);
-  SHARED block_rows := MIN(PBblas.Constants.Block_Vec_Rows, x_rows);
+  SHARED block_rows := MIN(PBblas_v0.Constants.Block_Vec_Rows, x_rows);
   SHARED x_map := Matrix_Map(x_rows, x_cols, block_rows, x_cols);
   SHARED y_map := Matrix_Map(y_rows, y_cols, block_rows, y_cols);
   SHARED b_map := Matrix_Map(x_cols, y_cols, x_cols, y_cols);
@@ -54,7 +54,7 @@ EXPORT OLS(DATASET(NumericField) X,DATASET(NumericField) Y)
   EXPORT DATASET(Types.NumericField) betas := sBetas;
 
   // the model Y values.
-  y_est := PBblas.PB_dgemm(FALSE, FALSE, 1.0, x_map, x_part, b_map, BetasAsPartition, y_map);
+  y_est := PBblas_v0.PB_dgemm(FALSE, FALSE, 1.0, x_map, x_part, b_map, BetasAsPartition, y_map);
   EXPORT DATASET(Part) modelY_part := y_est;
   Y_numbers := SET(DEDUP(SORT(Y,number),number),number);
   y_est_nf := DMat.Converted.FromPart2DS(modelY_part)(number IN Y_numbers);
@@ -63,11 +63,11 @@ EXPORT OLS(DATASET(NumericField) X,DATASET(NumericField) Y)
   // Extrapolated values
   EXPORT DATASET(Part) Extrapolated_part(DATASET(NumericField) newX) := FUNCTION
     nx_rows := MAX(newX, id);
-    new_block := MIN(PBblas.Constants.Block_Vec_Rows, nx_rows);
+    new_block := MIN(PBblas_v0.Constants.Block_Vec_Rows, nx_rows);
     nx_map  := Matrix_Map(nx_rows, x_cols, new_block, x_cols);
     ny_map  := Matrix_Map(nx_rows, y_cols, new_block, y_cols);
     nx_part := DMat.Converted.FromNumericFieldDS(newX, nx_map, 1, 1.0);
-    ny_ex := PBblas.PB_dgemm(FALSE, FALSE, 1.0, nx_map, nx_part, b_map, BetasAsPartition, ny_map);
+    ny_ex := PBblas_v0.PB_dgemm(FALSE, FALSE, 1.0, nx_map, nx_part, b_map, BetasAsPartition, ny_map);
     RETURN ny_ex;
   END;
   EXPORT DATASET(NumericField) Extrapolated(DATASET(NumericField) newX) := FUNCTION
@@ -96,7 +96,7 @@ EXPORT OLS(DATASET(NumericField) X,DATASET(NumericField) Y)
   xT_map := DMat.Trans.TranMap(x_map);
   xTx_map := Matrix_Map(xT_map.matrix_rows, x_map.matrix_cols, xT_map.part_rows(1), x_map.part_cols(1));
   
-  xTx_part := PBBlas.PB_dgemm(TRUE, FALSE, 1.0, x_map, x_part, x_map, x_part, xTx_map);
+  xTx_part := PBblas_v0.PB_dgemm(TRUE, FALSE, 1.0, x_map, x_part, x_map, x_part, xTx_map);
   inv_xTx_part := DMat.Inv(xTx_map, xTx_part);
   var_covar_part := DMat.Scale(xTx_map, Anova[1].Error_MS, inv_xTx_part);
   

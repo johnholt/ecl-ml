@@ -1,9 +1,9 @@
 ﻿//
-IMPORT PBblas;
+IMPORT PBblas_v0;
 EXPORT Types := MODULE
   EXPORT t_time_ord := UNSIGNED4;
-  EXPORT t_value := PBblas.Types.value_t;
-  EXPORT t_value_set := PBblas.Types.matrix_t;
+  EXPORT t_value := PBblas_v0.Types.value_t;
+  EXPORT t_value_set := PBblas_v0.Types.matrix_t;
   EXPORT t_model_id := UNSIGNED2;
   EXPORT UniObservation := RECORD
     t_time_ord period;

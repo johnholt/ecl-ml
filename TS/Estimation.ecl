@@ -12,13 +12,13 @@
 //In this version, all data for a model must fit on a single node
 // in memory.
 IMPORT TS;
-IMPORT PBblas;
+IMPORT PBblas_v0;
 //Aliases
-value_t := PBblas.Types.value_t;
-dim_t := PBblas.Types.dimension_t;
-matrix_t := PBblas.Types.matrix_t;
+value_t := PBblas_v0.Types.value_t;
+dim_t := PBblas_v0.Types.dimension_t;
+matrix_t := PBblas_v0.Types.matrix_t;
 // Intermediate types
-Model_cell := RECORD(PBblas.Types.Layout_Cell)
+Model_cell := RECORD(PBblas_v0.Types.Layout_Cell)
   TS.Types.t_model_id model_id;
   UNSIGNED2 lags;
 END;
@@ -108,28 +108,28 @@ EXPORT DATASET(TS.Types.Model_Parameters)
     lag_insert:= IF(base.constant_term, 1, 0);
     lag_cols  := lag_insert + IF(t=Target.rlag_set, base.ma_terms, base.ar_terms);
     SELF.dep_set := IF(t=Target.dep_set,
-                        PBblas.MakeR8Set(row_count, 1, first_row, 1,
-                                         PROJECT(cells, PBblas.Types.Layout_Cell),
+                        PBblas_v0.MakeR8Set(row_count, 1, first_row, 1,
+                                         PROJECT(cells, PBblas_v0.Types.Layout_Cell),
                                          0, 0.0),
                         base.dep_set);;
     SELF.lag_set := IF(t=Target.lag_set,
-                       PBblas.MakeR8Set(row_count, lag_cols, first_row, first_col,
-                                        PROJECT(cells, PBblas.Types.Layout_Cell),
+                       PBblas_v0.MakeR8Set(row_count, lag_cols, first_row, first_col,
+                                        PROJECT(cells, PBblas_v0.Types.Layout_Cell),
                                         lag_insert, 1.0),
                        base.lag_set);
     SELF.cov_set := IF(t=Target.cov_set,
-                       PBblas.MakeR8Set(base.ma_terms,1, 1, 1,
-                                        PROJECT(cells, PBblas.Types.Layout_Cell),
+                       PBblas_v0.MakeR8Set(base.ma_terms,1, 1, 1,
+                                        PROJECT(cells, PBblas_v0.Types.Layout_Cell),
                                         0, 0.0),
                        base.cov_set);
     SELF.yw_set  := IF(t=Target.yw_set,
-                       PBblas.MakeR8Set(base.ma_terms,base.ma_terms, 1, 1,
-                                        PROJECT(cells, PBblas.Types.Layout_Cell),
+                       PBblas_v0.MakeR8Set(base.ma_terms,base.ma_terms, 1, 1,
+                                        PROJECT(cells, PBblas_v0.Types.Layout_Cell),
                                         0, 0.0),
                        base.yw_set);
     SELF.rlag_set:= IF(t=Target.rlag_set, // row count and first row adjusted
-                       PBblas.MakeR8Set(row_count, base.ma_terms, first_row, 1,
-                                        PROJECT(cells, PBblas.Types.Layout_Cell),
+                       PBblas_v0.MakeR8Set(row_count, base.ma_terms, first_row, 1,
+                                        PROJECT(cells, PBblas_v0.Types.Layout_Cell),
                                         0, 0.0),
                         base.rlag_set);
     SELF := base;
@@ -143,22 +143,22 @@ EXPORT DATASET(TS.Types.Model_Parameters)
   // Calculate AR parameters and residuals
   Init_Work runOLS(Init_Work mat) := TRANSFORM
     lag_cols := mat.ar_terms + IF(mat.constant_term, 1, 0);
-    XtX := PBblas.BLAS.dgemm(TRUE,FALSE, lag_cols, lag_cols,
+    XtX := PBblas_v0.BLAS.dgemm(TRUE,FALSE, lag_cols, lag_cols,
                              mat.obs_cnt-mat.ar_terms, 1.0,
                              mat.lag_set, mat.lag_set, 0.0);
-    XtY := PBblas.BLAS.dgemm(TRUE,FALSE, lag_cols, 1,
+    XtY := PBblas_v0.BLAS.dgemm(TRUE,FALSE, lag_cols, 1,
                              mat.obs_cnt-mat.ar_terms, 1.0,
                              mat.lag_set, mat.dep_set, 0.0);
-    L := PBblas.LAPACK.dpotf2(PBblas.Types.Triangle.Lower, lag_cols, XtX);
-    s1:= PBblas.BLAS.dtrsm(PBblas.Types.Side.Ax, PBblas.Types.Triangle.Lower,
-                           FALSE, PBblas.Types.Diagonal.NotUnitTri,
+    L := PBblas_v0.LAPACK.dpotf2(PBblas_v0.Types.Triangle.Lower, lag_cols, XtX);
+    s1:= PBblas_v0.BLAS.dtrsm(PBblas_v0.Types.Side.Ax, PBblas_v0.Types.Triangle.Lower,
+                           FALSE, PBblas_v0.Types.Diagonal.NotUnitTri,
                            lag_cols, 1, lag_cols, 1.0, L, XtY);
-    bt:= PBblas.BLAS.dtrsm(PBblas.Types.Side.Ax, PBblas.Types.Triangle.Lower,
-                           TRUE, PBblas.Types.Diagonal.NotUnitTri,
+    bt:= PBblas_v0.BLAS.dtrsm(PBblas_v0.Types.Side.Ax, PBblas_v0.Types.Triangle.Lower,
+                           TRUE, PBblas_v0.Types.Diagonal.NotUnitTri,
                            lag_cols, 1, lag_cols, 1.0, L, s1);
-    p0:= PBblas.BLAS.dgemm(FALSE, FALSE, mat.obs_cnt-mat.ar_terms, 1, lag_cols,
+    p0:= PBblas_v0.BLAS.dgemm(FALSE, FALSE, mat.obs_cnt-mat.ar_terms, 1, lag_cols,
                            1.0, mat.lag_set, bt, 0.0);
-    r0 := PBblas.BLAS.daxpy(mat.obs_cnt-mat.ar_terms, -1.0, p0, 1, mat.dep_set, 1);
+    r0 := PBblas_v0.BLAS.daxpy(mat.obs_cnt-mat.ar_terms, -1.0, p0, 1, mat.dep_set, 1);
     SELF.betas := IF(mat.ar_terms>0, bt, []);
     SELF.residual:= IF(mat.ar_terms>0, r0, mat.dep_set);
     SELF := mat;
@@ -209,12 +209,12 @@ EXPORT DATASET(TS.Types.Model_Parameters)
   Init_Work solveYW(Init_Work iw) := TRANSFORM
     // Should use Durbin&apos;s algorithm to exploit persymetric yw matrix
     // Want to solve cov = yw * theta
-    LU:= PBblas.Block.dgetf2(iw.ma_terms, iw.ma_terms, iw.yw_set);
-    s1:= PBblas.BLAS.dtrsm(PBblas.Types.Side.Ax, PBblas.Types.Triangle.Lower,
-                           FALSE, PBblas.Types.Diagonal.UnitTri,
+    LU:= PBblas_v0.Block.dgetf2(iw.ma_terms, iw.ma_terms, iw.yw_set);
+    s1:= PBblas_v0.BLAS.dtrsm(PBblas_v0.Types.Side.Ax, PBblas_v0.Types.Triangle.Lower,
+                           FALSE, PBblas_v0.Types.Diagonal.UnitTri,
                            iw.ma_terms, 1, iw.ma_terms, 1.0, LU, iw.cov_set);
-    th:= PBblas.BLAS.dtrsm(PBblas.Types.Side.Ax, PBblas.Types.Triangle.Upper,
-                           FALSE, PBblas.Types.Diagonal.NotUnitTri,
+    th:= PBblas_v0.BLAS.dtrsm(PBblas_v0.Types.Side.Ax, PBblas_v0.Types.Triangle.Upper,
+                           FALSE, PBblas_v0.Types.Diagonal.NotUnitTri,
                            iw.ma_terms, 1, iw.ma_terms, 1.0, LU, s1);
     SELF.ma_coef := IF(iw.ma_terms>0, th, []);
     SELF := iw;
@@ -265,11 +265,11 @@ EXPORT DATASET(TS.Types.Model_Parameters)
     dep_inp := DATASET(iw.dep_set,Work_Val);
     dep_set := SET(PROJECT(dep_inp, scrnVals(LEFT,dep_trim, COUNTER)), cv);
     SELF.row_cnt := target_row_cnt;
-    SELF.delta := PBblas.BLAS.dasum(parm_cnt, initBetas, 1);
+    SELF.delta := PBblas_v0.BLAS.dasum(parm_cnt, initBetas, 1);
     SELF.full_x := lag_set + iw.rlag_set;;
     SELF.dep_set := dep_set;
     SELF.betas := initBetas;
-    SELF.w := PBblas.Block.make_vector(target_row_cnt);   // initial weights are 1.0
+    SELF.w := PBblas_v0.Block.make_vector(target_row_cnt);   // initial weights are 1.0
     SELF.resid_mean := AVE(iw.residual);
     SELF := iw;
   END;
@@ -279,30 +279,30 @@ EXPORT DATASET(TS.Types.Model_Parameters)
   // Adjust W, W(i) = 1/MAX(0.00001,ABS(Y(i) - X(i)*B(i)))
   value_t newWi(value_t v, dim_t r, dim_t c) := 1.0/MAX(0.00001, ABS(v));
   Irls_Work reweight(Irls_Work iw) := TRANSFORM
-    w_in := PBblas.Block.make_Diag(iw.row_cnt, 1.0, iw.w);
+    w_in := PBblas_v0.Block.make_Diag(iw.row_cnt, 1.0, iw.w);
     columns := iw.ar_terms + iw.ma_terms
              + IF(iw.ar_terms>0 AND iw.constant_term, 1, 0);
-    XtW  := PBblas.BLAS.dgemm(TRUE, FALSE, columns, iw.row_cnt, iw.row_cnt,
+    XtW  := PBblas_v0.BLAS.dgemm(TRUE, FALSE, columns, iw.row_cnt, iw.row_cnt,
                               1.0, iw.full_x, w_in, 0.0);
-    XtWY := PBblas.BLAS.dgemm(FALSE, FALSE, columns, 1, iw.row_cnt,
+    XtWY := PBblas_v0.BLAS.dgemm(FALSE, FALSE, columns, 1, iw.row_cnt,
                               1.0, XtW, iw.dep_set, 0.0);
-    XtWX := PBblas.BLAS.dgemm(FALSE, FALSE, columns, columns, iw.row_cnt,
+    XtWX := PBblas_v0.BLAS.dgemm(FALSE, FALSE, columns, columns, iw.row_cnt,
                               1.0, XtW, iw.full_x, 0.0);
-    LU_W := PBblas.Block.dgetf2(columns, columns, XtWX);
-    s1_w := PBblas.BLAS.dtrsm(PBblas.Types.Side.Ax, PBblas.Types.Triangle.Lower,
-                              FALSE, PBblas.Types.Diagonal.UnitTri,
+    LU_W := PBblas_v0.Block.dgetf2(columns, columns, XtWX);
+    s1_w := PBblas_v0.BLAS.dtrsm(PBblas_v0.Types.Side.Ax, PBblas_v0.Types.Triangle.Lower,
+                              FALSE, PBblas_v0.Types.Diagonal.UnitTri,
                               columns, 1, columns, 1.0, LU_W, XtWY);
-    NewB := PBblas.BLAS.dtrsm(PBblas.Types.Side.Ax, PBblas.Types.Triangle.Upper,
-                              FALSE, PBblas.Types.Diagonal.NotUnitTri,
+    NewB := PBblas_v0.BLAS.dtrsm(PBblas_v0.Types.Side.Ax, PBblas_v0.Types.Triangle.Upper,
+                              FALSE, PBblas_v0.Types.Diagonal.NotUnitTri,
                               columns, 1, columns, 1.0, LU_W, s1_w);
-    bdif := PBblas.BLAS.daxpy(columns, -1.0, NewB, 1, iw.betas, 1);
-    estm := PBblas.BLAS.dgemm(FALSE, FALSE, iw.row_cnt, 1, columns,
+    bdif := PBblas_v0.BLAS.daxpy(columns, -1.0, NewB, 1, iw.betas, 1);
+    estm := PBblas_v0.BLAS.dgemm(FALSE, FALSE, iw.row_cnt, 1, columns,
                               1.0, iw.full_x, NewB, 0.0);
-    rerr := PBblas.BLAS.daxpy(iw.row_cnt, -1.0, estm, 1, iw.dep_set, 1);
-    rsum := PBblas.BLAS.dasum(iw.row_cnt, rerr, 1);
-    wraw := PBblas.Block.Apply2Cells(iw.row_cnt, 1, rerr, newWi);
-    SELF.w := PBblas.BLAS.dscal(iw.row_cnt, rsum, wraw, 1);
-    SELF.delta := PBblas.BLAS.dasum(columns, bdif, 1);
+    rerr := PBblas_v0.BLAS.daxpy(iw.row_cnt, -1.0, estm, 1, iw.dep_set, 1);
+    rsum := PBblas_v0.BLAS.dasum(iw.row_cnt, rerr, 1);
+    wraw := PBblas_v0.Block.Apply2Cells(iw.row_cnt, 1, rerr, newWi);
+    SELF.w := PBblas_v0.BLAS.dscal(iw.row_cnt, rsum, wraw, 1);
+    SELF.delta := PBblas_v0.BLAS.dasum(columns, bdif, 1);
     SELF.betas := NewB;
     SELF := iw;
   END;

@@ -1,9 +1,9 @@
 ﻿//Dense matrix identity
-IMPORT PBblas;
-Part := PBblas.Types.Layout_Part;
-IMatrix_Map := PBblas.IMatrix_Map;
-t_matrix := PBblas.Types.matrix_t;
-t_dimension := PBblas.Types.dimension_t;
+IMPORT PBblas_v0;
+Part := PBblas_v0.Types.Layout_Part;
+IMatrix_Map := PBblas_v0.IMatrix_Map;
+t_matrix := PBblas_v0.Types.matrix_t;
+t_dimension := PBblas_v0.Types.dimension_t;
 // populate block
 t_matrix popBlock(t_dimension m) := BEGINC++
   #body

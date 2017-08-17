@@ -9,11 +9,11 @@ IMPORT ML.LSA.lsa AS LSA;
 IMPORT ML;
 IMPORT ML.Distribution AS Dist;
 IMPORT ML.DMat AS DMat;
-IMPORT PBblas.MU AS MU;
-IMPORT PBblas;
+IMPORT PBblas_v0.MU AS MU;
+IMPORT PBblas_v0;
 
-Part := PBblas.Types.Layout_Part;
-IMatrix_Map := PBblas.IMatrix_Map;
+Part := PBblas_v0.Types.Layout_Part;
+IMatrix_Map := PBblas_v0.IMatrix_Map;
 ToElm := DMat.Converted.FromPart2Elm;
 
 EXPORT RandomisedSVD := MODULE
@@ -26,9 +26,9 @@ EXPORT RandomisedSVD := MODULE
       SELF.y := ((l.id - 1) DIV dim) + 1 ;
       SELF.value := l.value;
     END;
-    g_map := PBblas.Matrix_map(dim, size, a_map.part_cols(1), size);  // G = n x k
+    g_map := PBblas_v0.Matrix_map(dim, size, a_map.part_cols(1), size);  // G = n x k
     gauss_mat := DMat.Converted.FromElement(PROJECT(data_gen, toMat(LEFT)), g_map);
-    y0_map := PBblas.Matrix_map(a_map.matrix_rows, g_map.matrix_cols, a_map.part_rows(1), g_map.part_cols(1)); // Y0 = m x k
+    y0_map := PBblas_v0.Matrix_map(a_map.matrix_rows, g_map.matrix_cols, a_map.part_rows(1), g_map.part_cols(1)); // Y0 = m x k
     Y0 := DMat.Mul(a_map, A, g_map, gauss_mat, y0_map);
     Q := ML.LSA.DenseSVD.QR(y0_map, Y0).QComp;
     RETURN Q;
@@ -39,12 +39,12 @@ EXPORT RandomisedSVD := MODULE
     UNSIGNED4 size := IF(r + 10 < a_map.matrix_cols, r + 10, a_map.matrix_cols);
     Q := RangeFinder(a_map, dA, size);  // Q = m x k
     aT_map := DMat.Trans.TranMap(a_map);
-    aTa_map := PBblas.Matrix_Map(aT_map.matrix_rows, a_map.matrix_cols, aT_map.part_rows(1), a_map.part_cols(1));
-    g_map := PBblas.Matrix_map(a_map.matrix_cols, size, a_map.part_cols(1), size);  // G = n x k
-    q_map := PBblas.Matrix_map(a_map.matrix_rows, g_map.matrix_cols, a_map.part_rows(1), g_map.part_cols(1)); // Y0 = m x k
+    aTa_map := PBblas_v0.Matrix_Map(aT_map.matrix_rows, a_map.matrix_cols, aT_map.part_rows(1), a_map.part_cols(1));
+    g_map := PBblas_v0.Matrix_map(a_map.matrix_cols, size, a_map.part_cols(1), size);  // G = n x k
+    q_map := PBblas_v0.Matrix_map(a_map.matrix_rows, g_map.matrix_cols, a_map.part_rows(1), g_map.part_cols(1)); // Y0 = m x k
     qT_map := DMat.Trans.TranMap(q_map);
-    b_map := PBblas.Matrix_map(qT_map.matrix_rows, a_map.matrix_cols, qT_map.part_rows(1), a_map.part_cols(1)); // B = k x n
-    B := PBBlas.PB_dgemm(TRUE, FALSE, 1.0, q_map, Q, a_map, dA, b_map);
+    b_map := PBblas_v0.Matrix_map(qT_map.matrix_rows, a_map.matrix_cols, qT_map.part_rows(1), a_map.part_cols(1)); // B = k x n
+    B := PBblas_v0.PB_dgemm(TRUE, FALSE, 1.0, q_map, Q, a_map, dA, b_map);
     decomp := ML.LSA.DenseSVD.SVD(b_map, B).MLN();
     QU := DMat.Mul(q_map, Q, b_map, MU.From(decomp, mat_type.U), a_map); // U = k x n, QU = m x n
     S := MU.From(decomp, mat_type.S); // S = n x n

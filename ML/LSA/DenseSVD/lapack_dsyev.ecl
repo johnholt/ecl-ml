@@ -1,4 +1,4 @@
-﻿IMPORT PBblas.Types;
+﻿IMPORT PBblas_v0.Types;
 dimension_t := Types.dimension_t;
 value_t     := Types.value_t;
 matrix_t    := Types.matrix_t;

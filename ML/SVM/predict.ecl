@@ -1,4 +1,4 @@
-// Produce a data set of predictions for each model
+﻿// Produce a data set of predictions for each model
 IMPORT ML.SVM;
 IMPORT ML.SVM.LibSVM;
 // aliases
@@ -75,6 +75,7 @@ EXPORT Predict(DATASET(Model) models, DATASET(SVM_Instance) d) := MODULE
     SELF.target_y := inst.y;
     SELF.predict_y := rslt_array[1].v;
     SELF.prob_estimates := CHOOSEN(rslt_array, ALL, 2);
+    SELF.labels := m.labels;
   END;
   EXPORT Pred_Prob_Est := JOIN(d, svm_mdls, TRUE, p_pest(LEFT, RIGHT), ALL);
 END;

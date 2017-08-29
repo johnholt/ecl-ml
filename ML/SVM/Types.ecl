@@ -109,5 +109,6 @@ EXPORT Types := MODULE
   END;
   EXPORT SVM_Pred_Prob_Est := RECORD(SVM_Prediction)
     DATASET(R8Entry) prob_estimates;
+	DATASET(I4Entry) labels;
   END;
 END;

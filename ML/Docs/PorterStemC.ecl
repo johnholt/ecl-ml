@@ -1,4 +1,4 @@
-STRING stem(STRING word) := EMBED(C++ : DISTRIBUTED)
+STRING stem(STRING word) := EMBED(C++)
 
 /* This is the Porter stemming algorithm presented in
 
@@ -306,6 +306,14 @@ class PorterStemmerClass
                     {
                         if (ends("\03" "bli"))
                             r("\03" "ble");
+                    /* -DEPARTURE-
+
+                       To match the published algorithm, replace previous
+                       statement with the following:
+
+                        if (ends("\04" "abli"))
+                            r("\04" "able");
+                    */
                         else if (ends("\04" "alli"))
                             r("\02" "al");
                         else if (ends("\05" "entli"))
@@ -358,6 +366,11 @@ class PorterStemmerClass
                             r("\03" "log");
                     }
                     break;
+                /* -DEPARTURE-
+
+                   To match the published algorithm, delete the entire
+                   case 'g' statement
+                */
 
             }
         }
@@ -549,10 +562,10 @@ class PorterStemmerClass
             if (k <= k0 + 1)
                 return k; /*-DEPARTURE-*/
 
-            /* With this line, strings of length 1 or 2 don't go through the
-                stemming process, although no mention is made of this in the
-                published algorithm. Remove the line to match the published
-                algorithm. */
+            /* With the previous if(), strings of length 1 or 2 don't go
+               through the stemming process, although no mention is made of
+               this in the published algorithm. Remove the line to match the
+               published algorithm. */
 
             step1ab();
             step1c();

@@ -62,9 +62,11 @@ EXPORT FromRow(DATASET(Types.Element) M,Types.t_index N) := PROJECT( M(X=N), TRA
 // Vector math
 // Compute the dot product of two vectors
 EXPORT Dot(DATASET(Types.VecElement) X,DATASET(Types.VecElement) Y) := FUNCTION
-  J := JOIN(x,y,LEFT.x=RIGHT.x,TRANSFORM(Types.VecElement,SELF.x := LEFT.x, SELF.value := LEFT.value*RIGHT.value, SELF:=LEFT));
-	RETURN SUM(J,value);
-END; 
+  X1 := DISTRIBUTE(X, x);
+  Y1 := DISTRIBUTE(Y, x);
+  J := JOIN(X1, Y1,LEFT.x=RIGHT.x,TRANSFORM(Types.VecElement,SELF.x := LEFT.x, SELF.value := LEFT.value*RIGHT.value, SELF:=LEFT), LOCAL);
+  RETURN SUM(J,value);
+END;
 
 EXPORT Norm(DATASET(Types.VecElement) X) := SQRT(Dot(X,X));
 

@@ -5,7 +5,7 @@ EXPORT Types.OnlyValue_DataSet
                   Types.OnlyValue_Dataset a2) := BEGINC++
   #ifndef ECL_LDA_ONLYVALUE
   #define ECL_LDA_ONLYVALUE
-  typedef  struct __attribute__ ((__packed__))  tagLDAOnlyValue {
+  struct __attribute__ ((__packed__))  tagLDAOnlyValue {
     double v;
   } LDAOnlyValue;
   #endif

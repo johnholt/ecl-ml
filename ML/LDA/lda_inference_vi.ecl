@@ -1,19 +1,19 @@
 // lda_inference by variational process
-IMPORT ML.LDA;
-IMPORT Types FROM $;
+IMPORT $ AS LDA;
+IMPORT $.Types AS Types;
 // aliases for convenience
-Doc_Topics := Types.Doc_Topics;
+Doc_Topics := Types.Doc_Topics_EM;
 Topic_Values := Types.Topic_Values;
 Topic_Value := Types.Topic_Value;
 TermFreq := Types.TermFreq;
 OnlyValue := Types.OnlyValue;
 
-EXPORT DATASET(Types.Doc_Topics)
-        lda_inference(DATASET(Types.Doc_Topics) dts, UNSIGNED cnt) := FUNCTION
+EXPORT DATASET(Types.Doc_Topics_EM)
+    lda_inference_vi(DATASET(Types.Doc_Topics_EM) dts, UNSIGNED cnt) := FUNCTION
   // Calculate the new phi arrays
   Doc_Topics calcNewPhi(Doc_Topics doc) := TRANSFORM
     num_words := COUNT(doc.word_counts);
-    SELF.t_phis := pre_norm_phis(num_words, doc.t_logBetas, doc.t_digammas);
+    SELF.t_phis := LDA.pre_norm_phis(num_words, doc.t_logBetas, doc.t_digammas);
     SELF := doc;
   END;
   docs_pn_phis := PROJECT(dts, calcNewPhi(LEFT));
@@ -25,27 +25,27 @@ EXPORT DATASET(Types.Doc_Topics)
     EMBEDDED DATASET(OnlyValue) phi_sums;
   END;
   Phi_Sums extSums(Doc_Topics doc) := TRANSFORM
-    SELF.phi_sums := topic_values_sum(doc.t_phis);
+    SELF.phi_sums := LDA.topic_values_sum(doc.t_phis);
     SELF := doc;
   END;
   p_sums_4_range := PROJECT(docs_pn_phis, extSums(LEFT));
   Phi_Sums rollSums(Phi_sums sum_phis, Phi_sums incr) := TRANSFORM
-    SELF.phi_sums := value_sum(sum_phis.phi_sums, incr.phi_sums);
+    SELF.phi_sums := LDA.value_sum(sum_phis.phi_sums, incr.phi_sums);
     SELF := sum_phis;
   END;
   p_sums := ROLLUP(p_sums_4_range, rollSums(LEFT, RIGHT), model, rid, LOCAL);
   p_sums_r := NORMALIZE(p_sums,LEFT.num_ranges,TRANSFORM(Phi_Sums,SELF:=LEFT));
   Topic_Value new_digamma(Topic_Value g) := TRANSFORM
     SELF.topic := g.topic;
-    SELF.v := digamma(g.v);
+    SELF.v := LDA.digamma(g.v);
   END;
   Doc_Topics norm_phis(Doc_Topics doc, Phi_Sums ps) := TRANSFORM
     ASSERT(doc.model=ps.model AND doc.rid=ps.rid,
            'Key mismatch, ' + doc.model + '/'+ doc.rid + ':' + doc.topic_range
            + ' v '
            + ps.model + '/' + ps.rid + ':' + ps.topic_range , FAIL);
-    t_phis := post_norm_phis(doc.t_phis, ps.phi_sums);
-    t_gammas := update_gammas(doc.alpha, t_phis, doc.word_counts);
+    t_phis := LDA.post_norm_phis(doc.t_phis, ps.phi_sums);
+    t_gammas := LDA.update_gammas(doc.alpha, t_phis, doc.word_counts);
     SELF.t_phis := t_phis;
     SELF.t_gammas := t_gammas;
     SELF.t_digammas := PROJECT(t_gammas, new_digamma(LEFT));
@@ -75,9 +75,9 @@ EXPORT DATASET(Types.Doc_Topics)
   Doc_level extValues(Doc_Topics dts) := TRANSFORM
     range_topics := (dts.topic_high-dts.topic_low+1);
     SELF.sum_gamma_k := SUM(dts.t_gammas, v);
-    SELF.sum_lgamma_gamma_k := SUM(dts.t_gammas, log_gamma(v));
+    SELF.sum_lgamma_gamma_k := SUM(dts.t_gammas, LDA.log_gamma(v));
     SELF.sum_alpha_k := range_topics * dts.alpha;
-    SELF.sum_lgamma_alpha_k := range_topics * log_gamma(dts.alpha);
+    SELF.sum_lgamma_alpha_k := range_topics * LDA.log_gamma(dts.alpha);
     SELF := dts;
   END;
   range_level_values := PROJECT(new_dts, extValues(LEFT));
@@ -106,16 +106,16 @@ EXPORT DATASET(Types.Doc_Topics)
   LogLikelihood range_ll(Doc_Topics d, Doc_level dl) := TRANSFORM
     ASSERT(d.model=dl.model AND d.rid=dl.rid,
            'Key mismatch at step ll1, ' + d.rid + ' : ' + dl.rid, FAIL);
-    eq1 := IF(d.topic_range=1, log_gamma(dl.sum_alpha_k), 0.0);
+    eq1 := IF(d.topic_range=1, LDA.log_gamma(dl.sum_alpha_k), 0.0);
     eq2 := IF(d.topic_range=1, dl.sum_lgamma_alpha_k, 0.0);
-    eq3 := SUM(d.t_digammas, (d.alpha-1)*(v-digamma(dl.sum_gamma_k)));
-    eq4 := n_phi_gamma_sum(d.t_phis, d.word_counts, d.t_digammas,
-                           digamma(dl.sum_gamma_k));
-    eq5 := n_phi_beta_sum(d.t_phis, d.word_counts, d.t_logBetas);
-    eq6 := IF(d.topic_range=1, log_gamma(dl.sum_gamma_k), 0.0);
-    eq7 := SUM(d.t_gammas, log_gamma(v));
-    eq8 := SUM(d.t_gammas, ((v-1.0) * (digamma(v) - digamma(dl.sum_gamma_k))));
-    eq9 := n_phi_log_phi_sum(d.t_phis, d.word_counts);
+    eq3 := SUM(d.t_digammas, (d.alpha-1)*(v-LDA.digamma(dl.sum_gamma_k)));
+    eq4 := LDA.n_phi_gamma_sum(d.t_phis, d.word_counts, d.t_digammas,
+                               LDA.digamma(dl.sum_gamma_k));
+    eq5 := LDA.n_phi_beta_sum(d.t_phis, d.word_counts, d.t_logBetas);
+    eq6 := IF(d.topic_range=1, LDA.log_gamma(dl.sum_gamma_k), 0.0);
+    eq7 := SUM(d.t_gammas, LDA.log_gamma(v));
+    eq8 := SUM(d.t_gammas, ((v-1.0) * (LDA.digamma(v) - LDA.digamma(dl.sum_gamma_k))));
+    eq9 := LDA.n_phi_log_phi_sum(d.t_phis, d.word_counts);
     SELF.log_likelihood := eq1 - eq2 + eq3 + eq4 + eq5 - eq6 + eq7 - eq8 - eq9;
     SELF := d;
   END;

@@ -7,21 +7,21 @@ select_betas(DATASET(Types.TermValue) betas,
              DATASET(Types.TermFreq) terms) := BEGINC++
   #ifndef ECL_LDA_TERMVALUE
   #define ECL_LDA_TERMVALUE
-  typedef  struct __attribute__ ((__packed__))  LDATermValue {
+  struct __attribute__ ((__packed__))  LDATermValue {
     uint64_t nominal;
     double v;
   };
   #endif
   #ifndef ECL_LDA_TERMFREQ
   #define ECL_LDA_TERMFREQ
-  typedef  struct __attribute__ ((__packed__))  LDATermFreq {
+  struct __attribute__ ((__packed__))  LDATermFreq {
     uint64_t nominal;
     uint32_t f;
   };
   #endif
   #ifndef ECL_LDA_ONLYVALUE
   #define ECL_LDA_ONLYVALUE
-  typedef struct __attribute__ ((__packed__)) LDAOnlyValue {
+  struct __attribute__ ((__packed__)) LDAOnlyValue {
     double v;
   };
   #endif

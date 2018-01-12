@@ -3,7 +3,7 @@ IMPORT $.Types AS Types;
  *
  */
 EXPORT DATASET(Types.Model_Topic)
-       Seeded_Initial_Values(DATASET(Types.Model_Parameters) parameters,
+       Seeded_Initial_Values(DATASET(Types.EM_Model_Parameters) parameters,
                              DATASET(Types.Term_Dict) terms,
                              DATASET(Types.Seed_Document) seeds) := FUNCTION
   //
@@ -23,7 +23,7 @@ EXPORT DATASET(Types.Model_Topic)
     REAL8 alpha;
   END;
   // get base
-  M_Term makeTerm(Types.Term_Dict term, Types.Model_Parameters p) := TRANSFORM
+  M_Term makeTerm(Types.Term_Dict term, Types.EM_Model_Parameters p) := TRANSFORM
     SELF.model := p.model;
     SELF.num_topics := p.num_topics;
     SELF.nominal := term.nominal;
@@ -64,7 +64,7 @@ EXPORT DATASET(Types.Model_Topic)
   srt_terms := UNGROUP(SORT(GROUP(nrm_terms, model, topic), nominal));
   MT_Term rollM(MT_Term frst, MT_Term scnd) := TRANSFORM
     SELF.alpha := IF(frst.alpha<>0.0, frst.alpha, scnd.alpha);
-    SELF.v := LN((frst.freq + scnd.freq) / frst.total_freq);
+    SELF.v := (frst.freq + scnd.freq) / frst.total_freq;
     SELF.freq := frst.freq + scnd.freq;
     SELF := frst;
   END;
@@ -75,7 +75,7 @@ EXPORT DATASET(Types.Model_Topic)
     SELF.model := f.model;
     SELF.topic := f.topic;
     SELF.alpha := f.alpha;
-    SELF.logBetas := PROJECT(rws, Types.TermValue);
+    SELF.weights := PROJECT(rws, Types.TermValue);
   END;
   rslt := ROLLUP(grp_terms, GROUP, rollBetas(LEFT, ROWS(LEFT)));
   RETURN rslt;

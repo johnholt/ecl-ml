@@ -46,7 +46,7 @@ estimate_alpha := TRUE;
 IMPORT ML.LDA;
 IMPORT STD.Str;
 // Make the parameter dataset, 1 record
-LDA.Types.Model_Parameters makeParm() := TRANSFORM
+LDA.Types.EM_Model_Parameters makeParm() := TRANSFORM
   SELF.model := 1;
   SELF.num_topics := num_topics;
   SELF.alpha := alpha;
@@ -56,6 +56,7 @@ LDA.Types.Model_Parameters makeParm() := TRANSFORM
   SELF.beta_epsilon := em_convergence;
   SELF.estimate_alpha := estimate_alpha;
   SELF.initial_alpha := alpha;
+  SELF.initial_beta := -100.0;    // small number, is log
 END;
 model_parms := DATASET([makeParm()]);
 // extract the initial model values, alpha and the betas
@@ -70,13 +71,13 @@ init_raw_betas := PROJECT(DATASET(init_beta, StrRec, CSV),
                           TRANSFORM(beta_text, SELF.topic:=COUNTER, SELF:=LEFT));
 LDA.Types.TermValue extV(STRING s, UNSIGNED n) := TRANSFORM
   SELF.nominal := n;
-  SELF.v := (REAL8) s;   // values from lda-dist-c are log(beta)
+  SELF.v := EXP((REAL8) s);   // values from lda-dist-c are log(beta)
 END;
 LDA.Types.Model_Topic getBetas(beta_text bt) := TRANSFORM
   SELF.model := 1;
   SELF.topic := bt.topic;
   SELF.alpha := alpha;
-  SELF.logBetas := PROJECT(DATASET(Str.SplitWords(bt.line, ' '), StrRec),
+  SELF.weights := PROJECT(DATASET(Str.SplitWords(bt.line, ' '), StrRec),
                            extV(LEFT.line, COUNTER-1));
 END;
 initial_model := PROJECT(init_raw_betas, getBetas(LEFT))
@@ -104,9 +105,10 @@ docs := PROJECT(wd, LDA.Types.Doc_Mapped)
 //**************************************************************************
 // Run LDA
 //**************************************************************************
-stats := LDA.Collection_Stats(model_parms, docs);
-test_topics := LDA.Topic_Estimation(model_parms, initial_model, stats, docs)
+stats := LDA.Collection_Stats(model_parms, docs).Stats;
+test_topics := LDA.Topic_Estimation_EM(model_parms, initial_model, stats, docs)
              : PERSIST(filename_prefix+'result', EXPIRE(10), SINGLE);
+scored_docs := LDA.Document_Inference_VI(model_parms, test_topics, stats, docs);
 // get baseline beta values
 base_raw_betas := PROJECT(DATASET(final_beta, StrRec, CSV),
                          TRANSFORM(beta_text, SELF.topic:=COUNTER, SELF:=LEFT));
@@ -121,10 +123,10 @@ Topic_Nominal_Beta exBeta(LDA.Types.Model_Topic m,
   SELF.topic := m.topic;
   SELF.model := m.model;
   SELF.nominal := tv.nominal;
-  SELF.v := EXP(tv.v);
+  SELF.v := tv.v;
 END;
 base_betas := NORMALIZE(PROJECT(base_raw_betas, getBetas(LEFT)),
-                       LEFT.logBetas, exBeta(LEFT, RIGHT));
+                       LEFT.weights, exBeta(LEFT, RIGHT));
 // get baseline document topic scores
 LDA.Types.Topic_Value extTV(STRING s, UNSIGNED t) := TRANSFORM
   SELF.topic := t;
@@ -139,6 +141,7 @@ LDA.Types.Document_Scored extDocGamma(StrRec sr, UNSIGNED r) := TRANSFORM
 END;
 base_raw_gammas := PROJECT(DATASET(final_gamma, {STRING line}, CSV),
                            extDocGamma(LEFT, COUNTER));
+
 // get alpha
 Alpha_Rec := RECORD
   LDA.Types.t_topic topic;
@@ -172,7 +175,7 @@ Freq_Rec := RECORD
 END;
 freqs := TABLE(doc_terms, Freq_Rec, nominal, FEW, UNSORTED);
 // Compares
-diff_threshold := 0.0001;
+diff_threshold := 0.00001;
 // Compare alpha (only 1 needed, use topic 1
 Alpha_Compare := RECORD
   REAL8 base_alpha;
@@ -191,9 +194,9 @@ Topic_Nominal_Beta extTest(LDA.Types.Model_Topic tm, LDA.Types.TermValue b):=TRA
   SELF.model := tm.model;
   SELF.topic := tm.topic;
   SELF.nominal := b.nominal;
-  SELF.v := EXP(b.v);
+  SELF.v := b.v;
 END;
-test_betas := NORMALIZE(test_topics, LEFT.logBetas, extTest(LEFT,RIGHT));
+test_betas := NORMALIZE(test_topics, LEFT.weights, extTest(LEFT,RIGHT));
 // Compare beta values
 Beta_Compare := RECORD
   LDA.Types.t_topic topic;
@@ -273,8 +276,8 @@ likelihoods := DEDUP(SORT(raw_likelihoods, iteration), RECORD);
 // check the topic terms
 grpd_test_topic_betas := GROUP(SORT(test_betas, model, topic), model, topic);
 grpd_base_topic_betas := GROUP(SORT(base_betas, model, topic), model, topic);
-test_top_betas := TOPN(grpd_test_topic_betas, 5, -v);
-base_top_betas := TOPN(grpd_base_topic_betas, 5, -v);
+test_top_betas := TOPN(grpd_test_topic_betas, 5, -v, nominal);
+base_top_betas := TOPN(grpd_base_topic_betas, 5, -v, nominal);
 Topic_Term := RECORD
   LDA.Types.t_model_id model;
   LDA.Types.t_topic topic;
@@ -318,9 +321,33 @@ match_tab := TABLE(scored, {score, topics:=COUNT(GROUP)}, score, FEW, UNSORTED);
 match_rpt := SORT(match_tab, -score);
 // Top terms
 top_terms_dev := LDA.Top_Terms(test_topics, vocab).outliers(10);
+// Compare topic assignments
+Topic_Assignment := RECORD
+  LDA.Types.t_model_id model;
+  LDA.Types.t_record_id rid;
+  LDA.Types.t_topic topic;
+  REAL8 v;
+  UNSIGNED1 src;
+END;
+Topic_Assignment get_top(LDA.Types.Document_Scored doc, UNSIGNED1 src) := TRANSFORM
+  SELF.v := EVALUATE(SORT(doc.topics, -v)[1], v);
+  SELF.topic := EVALUATE(SORT(doc.topics, -v)[1], topic);
+  SELF.src := src;
+  SELF := doc;
+END;
+base_assign_topic := PROJECT(base_raw_gammas, get_top(LEFT, 1));
+test_assign_topic := PROJECT(scored_docs, get_top(LEFT, 2));
+t_doc_topic := TABLE(base_assign_topic+test_assign_topic,
+                     {model, rid, topic, flag:=SUM(GROUP,src)},
+                     model, rid, topic, MERGE);
+t_topic_work := TABLE(t_doc_topic, {model, topic,
+                      both:=SUM(GROUP, IF(flag=3, 1, 0)),
+                      added:=SUM(GROUP, IF(flag=2, 1, 0)),
+                      dropped:=SUM(GROUP, IF(flag=1, 1, 0)),
+                      total:=COUNT(GROUP)}, model, topic, FEW, UNSORTED);
+t_topic_cmpr := SORT(t_topic_work, model, topic);
 //
-doc_tab := TABLE(wd, {num_docs:=COUNT(GROUP), ave_size:=AVE(GROUP,terms),
-                      max_size:=MAX(GROUP, terms), min_size:=MIN(GROUP,terms)});
+doc_tab := stats;
 /**
  * Compare LDA topic model estimate to a prior estimate.
  * @return an action composition of the report outputs
@@ -334,4 +361,6 @@ EXPORT lda_cmpr2blei := PARALLEL(
                               ,OUTPUT(pairs, NAMED('Model_base_Topic_Matches'))
                               ,OUTPUT(match_rpt, NAMED('Topic_Match_Counts'))
                               ,OUTPUT(likelihoods, NAMED('likelihood_hist'))
+                              ,OUTPUT(top_terms_dev, NAMED('Top_Terms'))
+                              ,OUTPUT(t_topic_cmpr, NAMED('Cmpr_Topic_Assignments'))
                             );

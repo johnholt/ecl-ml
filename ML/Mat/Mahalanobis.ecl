@@ -1,87 +1,82 @@
-IMPORT ML;
+﻿IMPORT ML;
 
-REAL8 gamma(REAL8 z) := BEGINC++
-  #option pure
-  #include <math.h>
-  #body
-  return tgamma(x);
-ENDC++;
-
-REAL8 lowerGamma(REAL8 x, REAL8 y)	:= BEGINC++
-        #include <math.h>
-        double n,r,s,ga,t,gin;
-        int k;
-
-        if ((x < 0.0) || (y < 0)) return 0;
-        n = -y+x*log(y);
-
-        if (y == 0.0) {
-                gin = 0.0;
-                return gin;
-        }
-
-        if (y <= 1.0+x) {
-                s = 1.0/x;
-                r = s;
-                for (k=1;k<=100;k++) {
-                        r *= y/(x+k);
-                        s += r;
-                        if (fabs(r/s) < 1e-15) break;
-             }
-
-        gin = exp(n)*s;
-        }
-        else {
-                t = 0.0;
-                for (k=100;k>=1;k--) {
-                  t = (k-x)/(1.0+(k/(y+t)));
-                }
-                ga = exp(tgamma(x));
-                gin = ga-(exp(n)/(y+t));
-        }
-        return gin;
-ENDC++;
-
-ChiSquareCDF(INTEGER df, REAL cv) := FUNCTION
-        RETURN lowerGamma(df / 2, cv / 2) / gamma(df / 2);
+/**
+ * Calculate the cumulative probability for x in df degrees of freedom 
+ * 
+ * @author  Custodio Jose Eleandro
+ * @version 1.0
+ *
+ * @param df  Degrees of freedom
+ * @param x   chi-squared distributed value
+ * @return cumulative probability for x in df degrees of freedom 
+ */
+ChiSquareCDF(INTEGER df, REAL x) := FUNCTION
+	RETURN ML.Utils.lowerGamma(df / 2, x / 2) / ML.Utils.gamma(df / 2);
 END;
 
-EXPORT Mahalanobis(DATASET(ML.Mat.Types.Element) A, REAL sensitivity = 0.05) := MODULE
-        ZComp := ML.Mat.Pca(A).ZComp;
+/**
+ * This function calculates the Mahanlanobis distance over a collection of data points represented as matrix.
+ * 
+ *
+ * @author  Custodio Jose Eleandro
+ * @version 1.0
+ *
+ * @param A  matrix of points - every row represent an observation and every column as variable
+ * @param sensitivity  Cuffoff point to considere an obaservation an outlier.
+ *                     Ex. 0.05 means that every point above 95% of probability will be considered outlier.
+ *
+ * @return dsq  DATASET containing the Mahalanobis distance
+ * @return prob DATASET containing the chisquared probability for that distance and degree of freedom;
+ * @return is_outlier  DATASET containing 1's for outliers and 0's otherwise
+ */
+Export Mahalanobis(DATASET(ML.Mat.Types.Element) A, REAL sensitivity = 0.05) := MODULE
+	// Transforming the data into PCA componentes. This step will remove correlation betwen points
+	ZComp := ML.Mat.Pca(A).ZComp;
 
-        // Calculate standard deviation for each column
-        stdev := TABLE(ZComp, {
-                y;
-                stdev := SQRT(VARIANCE(GROUP, value));
-        }, y);
+	// Calculate sample standard deviation for each column
+	stdev := TABLE(ZComp, {
+		y;
+		stdev:= SQRT(SUM(GROUP, value * value)/(MAX(GROUP, x)-1 ));
+	}, y);
 
-        // Creates ZComp with normalized columns
-        ZCompNorm := PROJECT(JOIN(ZComp, stdev, LEFT.y = RIGHT.y), TRANSFORM(
-                ML.Mat.Types.Element,
-                SELF.x := LEFT.x;
-                SELF.y := LEFT.y;
-                SELF.value := LEFT.value / LEFT.stdev;
-        ));
+	//Since componentes are not normalize, normalized it using sample standard deviation.
+	ZCompNorm := PROJECT(JOIN(ZComp, stdev, LEFT.y = RIGHT.y), TRANSFORM(
+		ML.Mat.Types.Element,
+		SELF.x := LEFT.x;
+		SELF.y := LEFT.y;
+		SELF.value := LEFT.value / LEFT.stdev;
+	));
 
-        // Calculates distance squared
-        EXPORT dsq := PROJECT(TABLE(ZCompNorm, {
-                x;
-                dsq := SUM(GROUP, value * value);
-        }, x), TRANSFORM(
-                ML.Mat.Types.Element,
-                SELF.x := LEFT.x;
-                SELF.y := 1;
-                SELF.value := LEFT.dsq;
-        ));
+	//  Mahalanobis distance is the sum of squared of the normalized componentes (D^2 = sum(normalized comp^2))
+	EXPORT dsq := PROJECT(
+		TABLE(ZCompNorm, {x;dsq := SUM(GROUP, value * value);}, x),
+		TRANSFORM(
+			ML.Mat.Types.Element,
+			SELF.x := LEFT.x;
+			SELF.y := 1;
+			SELF.value := LEFT.dsq;
+		)
+	);
 
-        // Calculates how many degrees of freedom we are dealing with
-        df := ML.Mat.Has(A).Stats.YMax;
+	// Calculates how many degrees of freedom we are dealing with
+	df := ML.Mat.Has(A).Stats.YMax;
+	
 
-        // Verifies if p-value of each DSQ exceeds defined sensitivity
-        EXPORT is_outlier := PROJECT(dsq, TRANSFORM(
-                ML.Mat.Types.Element,
-                SELF.x := LEFT.x;
-                SELF.y := 1;
-                SELF.value := IF(ChiSquareCDF(df, LEFT.value) > (1 - sensitivity), 1, 0);
-        ));
+	// dsq is  chisquared distribuited, so it is possible to turn it distances into probabilities using X^2 CDF function
+	// and according to normal assumptions it could be interpretated as probability of being outlier.
+	EXPORT prob := PROJECT(dsq, TRANSFORM(
+		ML.Mat.Types.Element,
+		SELF.x := LEFT.x;
+		SELF.y := 1;
+		SELF.value := ChiSquareCDF(df, LEFT.value);
+	));	
+	
+
+	// Verifies if p-value of each DSQ exceeds defined sensitivity
+	EXPORT is_outlier := PROJECT(prob, TRANSFORM(
+		ML.Mat.Types.Element,
+		SELF.x := LEFT.x;
+		SELF.y := 1;
+		SELF.value := IF(LEFT.value > (1 - sensitivity), 1, 0);
+	));
 END;

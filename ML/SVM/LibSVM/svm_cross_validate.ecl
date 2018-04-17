@@ -19,7 +19,7 @@ EXPORT Result svm_cross_validate(SVM_Parms prm,
     #endif
     #ifndef ECL_LIBSVM_TRAIN_PARAM
     #define ECL_LIBSVM_TRAIN_PARAM
-      typedef struct __attribute__ ((__packed__)) ecl_svm_parameter {
+      struct __attribute__ ((__packed__)) ecl_svm_parameter {
         unsigned short svm_type;
         unsigned short kernel_type;
         int degree;
@@ -37,7 +37,7 @@ EXPORT Result svm_cross_validate(SVM_Parms prm,
     #endif
     #ifndef ECL_SVM_PROBLEM
     #define ECL_SVM_PROBLEM
-      typedef struct __attribute__ ((__packed__)) ecl_svm_problem {
+      struct __attribute__ ((__packed__)) ecl_svm_problem {
         unsigned int elements;
         int entries;
         unsigned int features;
@@ -46,14 +46,14 @@ EXPORT Result svm_cross_validate(SVM_Parms prm,
     #endif
     #ifndef ECL_SVM_NODE
     #define ECL_SVM_NODE
-      typedef struct __attribute__ ((__packed__))  Packed_SVM_Node {
+      struct __attribute__ ((__packed__))  Packed_SVM_Node {
         int indx;
         double value;
       };
     #endif
     #ifndef ECL_CROSSVALIDATE_RESULT
     #define ECL_CROSSVALIDATE_RESULT
-      typedef struct CrossValidate_Result {
+      struct CrossValidate_Result {
         double mse;
         double r_sq;
         double correct;
